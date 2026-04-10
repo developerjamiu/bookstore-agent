@@ -1,0 +1,7 @@
+.dart_tool/
+.DS_Store
+.idea/
+*.iml
+.metadata
+pubspec.lock
+genkit-agent-codelab-plan.md

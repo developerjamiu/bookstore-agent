@@ -1,18 +1,9 @@
-import 'package:genkit/genkit.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
-import '../schemas/research_result.dart';
 import '../utils/request_helpers.dart';
 
-typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
-
 class ResearchRoutes {
-  final ResearchFlow _researchFlow;
-
-  ResearchRoutes({required ResearchFlow researchFlow})
-    : _researchFlow = researchFlow;
-
   Router get router {
     final router = Router();
     router.post('/api/research', _research);
@@ -28,14 +19,13 @@ class ResearchRoutes {
       return errorResponse(400, 'question is required');
     }
 
-    try {
-      final result = await _researchFlow(question);
-      return jsonResponse(result.toJson());
-    } on GenkitException catch (e) {
-      return handleGenkitError(e);
-    } catch (e) {
-      print('Unexpected error: $e');
-      return errorResponse(500, 'Agent failed. Check server logs for details.');
-    }
+    // TODO: Replace this placeholder with a real agent flow.
+    return jsonResponse({
+      'answer': 'This is a placeholder. Complete the codelab to power this '
+          'with a real AI agent that explores the music store database!',
+      'sources': <String>[],
+      'confidence': 'low',
+      'toolCalls': <Map<String, String>>[],
+    });
   }
 }

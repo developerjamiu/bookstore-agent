@@ -1,0 +1,27 @@
+{
+  "name": "research-assistant-server-js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Music store research agent (Node.js + Genkit)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@genkit-ai/google-genai": "^1.32.0",
+    "better-sqlite3": "^12.8.0",
+    "genkit": "^1.32.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

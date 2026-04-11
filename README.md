@@ -110,8 +110,8 @@ research_assistant/
 ### 1. Clone and install dependencies
 
 ```sh
-git clone <repo-url>
-cd research_assistant
+git clone git@github.com:developerjamiu/music-store-agent.git
+cd music-store-agent
 dart pub get
 ```
 

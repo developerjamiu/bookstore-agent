@@ -25,8 +25,8 @@ This is not a chatbot. It's an **agent** — an LLM that sits in a loop, picks t
 ## Step 0: Get the Starter Project
 
 ```sh
-git clone <repo-url>
-cd research_assistant
+git clone git@github.com:developerjamiu/music-store-agent.git
+cd music-store-agent
 git checkout starter
 dart pub get
 ```

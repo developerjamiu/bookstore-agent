@@ -41,11 +41,13 @@ Every tool call is a **decision the model made** — visible in the UI's
 | ------------ | ----------------------------------------------------------- |
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) |
 | LLM          | Google Gemini (via `genkit_google_genai`)                   |
-| Server       | Shelf (Dart HTTP server)                                    |
+| Server       | Shelf (Dart) or Node.js HTTP server (`packages/server` · `packages/nodeJS-server`) |
 | Database     | SQLite (in-process, no server needed)                       |
 | Schemas      | Schemantic (code-generated JSON schemas)                    |
 | Client       | Flutter (Material 3)                                        |
 | Testing      | Fake models via `ai.defineModel()` — no mocking libraries   |
+
+**Node.js backend (optional):** same HTTP API for the Flutter client. Use [Genkit for JavaScript](https://genkit.dev/docs/js/get-started/) with `@genkit-ai/google-genai`, **Zod** schemas via `genkit`, **`better-sqlite3`**, and TypeScript in `packages/nodeJS-server/`.
 
 ## Repository Structure
 
@@ -55,6 +57,29 @@ research_assistant/
 ├── README.md
 │
 ├── packages/
+│   ├── nodeJS-server/                   # Node + Genkit (TypeScript) — same /api/research API
+│   │   ├── package.json
+│   │   ├── package-lock.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts                 # HTTP server; opens SQLite; wires research flow
+│   │       ├── middleware/
+│   │       │   └── cors.ts              # CORS headers + OPTIONS preflight
+│   │       ├── routes/
+│   │       │   └── research.ts          # POST /api/research; validates JSON; calls agent flow
+│   │       ├── schemas/
+│   │       │   └── researchResult.ts    # Zod: ResearchResult, tool calls, synthesis output
+│   │       ├── tools/
+│   │       │   ├── listTables.ts        # Tool: list SQLite tables
+│   │       │   ├── describeTable.ts     # Tool: PRAGMA schema / FKs for one table
+│   │       │   └── runQuery.ts          # Tool: read-only SELECT (row cap)
+│   │       ├── utils/
+│   │       │   ├── requestHelpers.ts    # JSON responses + Genkit error mapping
+│   │       │   └── messageHelpers.ts     # Extract tool calls; build research notes for synthesis
+│   │       └── agent/
+│   │           ├── researchAgent.ts      # Two-phase agent: tool loop + structured synthesis
+│   │           └── setup.ts             # Composition root: Genkit + tools + flow
+│   │
 │   ├── server/
 │   │   ├── bin/server.dart              # Shelf server entrypoint
 │   │   ├── data/music_store.db          # Pre-seeded SQLite database
@@ -102,7 +127,8 @@ research_assistant/
 
 - **Dart SDK** >= 3.11 (`dart --version`)
 - **Flutter SDK** >= 3.27 (`flutter --version`)
-- **Google AI API key** — get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- **Google AI API key** — get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (set `GOOGLE_API_KEY` for Dart; `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Node — never commit keys)
+- **Node.js** >= 20 (`node --version`) — only if you run `packages/nodeJS-server`
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) to browse the database visually
 
 ## Getting Started
@@ -163,6 +189,19 @@ Try it:
     -H "Content-Type: application/json" \
     -d '{"question":"Which genre has the most tracks?"}' | jq
 ```
+
+### 4b. Start the Node.js server (alternative backend)
+
+Use **either** the Dart server **or** the Node server on port **8080** — not both at once. The Node app reads the same database file: `packages/server/data/music_store.db`.
+
+```sh
+cd packages/nodeJS-server
+npm install
+export GEMINI_API_KEY=your-key-here
+npm start
+```
+
+You should see the same style of startup message and can use the same `curl` examples below against `http://localhost:8080`.
 
 ### 5. Test with curl
 
@@ -232,9 +271,11 @@ agent works around this with two separate calls:
 
 - **Flutter client** — complete, working UI with answer card, tool trace panel,
   loading states, error handling, and "New question" reset
-- **Server scaffolding** — `bin/server.dart`, CORS middleware,
+- **Dart server scaffolding** — `packages/server`: `bin/server.dart`, CORS,
   `request_helpers.dart`, route returning placeholder data
-- **SQLite database** — `data/music_store.db` pre-seeded with all 9 tables
+- **Node server scaffolding** (on starter forks) — `packages/nodeJS-server` shell with
+  placeholder `POST /api/research`; on **`main`** here, the full Node agent matches the Dart reference
+- **SQLite database** — `packages/server/data/music_store.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)
 - **Pubspec files** — all dependencies already configured
 - **Client tests** — unit, widget, and integration tests (all passing)
 
@@ -251,13 +292,15 @@ agent works around this with two separate calls:
 | **Agent tests** — `research_agent_test.dart`                                                                                    | Test the agent using `ai.defineModel()` with fake responses                   |
 | **Tool tests** — `list_tables_test.dart`, `describe_table_test.dart`, `run_query_test.dart`                                     | Test each tool's logic method against a real in-memory database               |
 
+**Node track (`packages/nodeJS-server/`):** add Zod schemas, tools, `messageHelpers`, `ResearchAgent`, `setup`, then wire `research.ts` and `index.ts` (same API as Dart for Flutter).
+
 ### The codelab experience
 
-1. **Before the codelab** — start the server, open the app, ask a question →
-   you get placeholder data ("This is a placeholder response...")
-2. **During the codelab** — build schemas, tools, agent, tests step by step
-3. **After the codelab** — ask the same question → a real AI agent explores
-   the database, runs SQL, and answers with sources and a full tool trace
+1. **Before** — start the server, open the app, ask a question → you get
+   placeholder data ("This is a placeholder response...")
+2. **While building** — add schemas, tools, agent, tests step by step
+3. **After** — ask the same question → a real AI agent explores the database,
+   runs SQL, and answers with sources and a full tool trace
 
 ## Key Concepts Covered
 
@@ -268,3 +311,4 @@ agent works around this with two separate calls:
 - **Fake model testing** — `ai.defineModel()` for deterministic tests without API calls
 - **Constructor DI** — every class receives dependencies via constructor
 - **Composition root** — one place wires everything together
+- **Node parity** — Genkit JS tools + flows; SQLite via `better-sqlite3`; same JSON contract for the Flutter client

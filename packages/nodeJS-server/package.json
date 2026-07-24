@@ -1,0 +1,24 @@
+{
+  "name": "research-assistant-server-js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Music store research agent — starter shell (placeholder API only)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "genkit": "^1.32.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

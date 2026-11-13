@@ -472,14 +472,7 @@ class RunQueryTool {
 
 `query` returns SQL errors as text instead of throwing, so the model can read it and fix its SQL.
 
-**Verify:** `dart analyze` prints `No issues found!` Then run `main`'s tool tests against your code (no model needed):
-
-```sh
-git checkout origin/main -- test/src/tools
-dart test test/src/tools
-```
-
-Expect `All tests passed!`.
+**Verify:** `dart analyze` prints `No issues found!`
 
 ---
 

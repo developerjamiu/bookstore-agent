@@ -13,7 +13,6 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 - Building an agentic flow with a tool-calling loop and `maxTurns`
 - Getting a structured JSON answer from a model that uses tools
 - Making the agent admit when it can't answer, instead of inventing one
-- Wiring everything together with constructor dependency injection
 
 **Time:** 45 to 60 minutes
 
@@ -38,7 +37,7 @@ flutter pub get
 
 The starter has a **complete Flutter app** and a **Dart server** that returns placeholder data. You'll replace the placeholder with an AI agent.
 
-The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP framework. Two files in `packages/dart_server/lib/src` are pre-built and stay as they are: `middleware/cors.dart` lets browsers call the API, and `utils/request_helpers.dart` reads and writes JSON and turns Genkit errors into HTTP errors.
+The server uses [Relic](https://docs.dartrelic.dev/), a high-performance, type-safe Dart web server built by the Serverpod team. Two files in `packages/dart_server/lib/src` are pre-built and stay as they are: `middleware/cors.dart` lets browsers call the API, and `utils/request_helpers.dart` reads and writes JSON and turns Genkit errors into HTTP errors.
 
 **Browse the database:**
 
@@ -650,11 +649,9 @@ How it works:
 
 ---
 
-## Step 5: Wire Everything in the Composition Root
+## Step 5: Connect the Pieces
 
-Each class you wrote gets what it needs (`ai`, `db`, the tools) through its constructor instead of creating it. This is dependency injection. `AISetup` is the one place that creates those objects and passes them in, which is called the composition root.
-
-Create `packages/dart_server/lib/src/agent/setup.dart`:
+Create `packages/dart_server/lib/src/agent/setup.dart`. It creates the tools and the agent, and hands each one what it needs:
 
 ```dart
 import 'package:genkit/genkit.dart';
@@ -695,7 +692,7 @@ class AISetup {
 
 ## Step 6: Connect the Agent to the Route
 
-Now the route runs the agent instead of returning the placeholder. It gets the flow through its constructor, like the tools in Step 2. Replace the contents of `packages/dart_server/lib/src/routes/research.dart` with:
+Replace the contents of `packages/dart_server/lib/src/routes/research.dart` with:
 
 ```dart
 import 'package:genkit/genkit.dart';
@@ -739,12 +736,13 @@ class ResearchRoutes {
 }
 ```
 
-The router and the request validation are unchanged. What's new:
+How it works:
 
-- `_researchFlow(question)` runs the agent, and `result.toJson()` turns the `ResearchResult` into the JSON the app reads.
-- `handleGenkitError`, pre-built in `request_helpers.dart`, maps the `status` of a `GenkitException` to an HTTP status: `resourceExhausted` (your API quota ran out) becomes 429, `unavailable` (the model is overloaded) becomes 503, and anything else becomes 500.
+- **Routing with Relic:** `RelicRouter` sends `POST /api/research` to `_research`. A Relic handler takes a `Request` and returns a `Response`.
+- **Running the agent:** `_researchFlow(question)` runs the agent, and `result.toJson()` turns the `ResearchResult` into the JSON the app reads.
+- **Errors:** `handleGenkitError`, from `request_helpers.dart`, turns a Genkit error into an HTTP status: 429 when your API quota runs out, 503 when the model is overloaded, and 500 otherwise.
 
-Until you update the entrypoint in Step 7, `dart analyze` reports one error in `bin/server.dart`: "The named parameter 'researchFlow' is required". That is expected.
+`dart analyze` now reports one error in `bin/server.dart`: "The named parameter 'researchFlow' is required". Step 7 fixes it.
 
 ---
 
@@ -790,6 +788,8 @@ Future<void> main() async {
 
 Everything above the `RelicApp` setup is new. It checks that the database file exists, creates Genkit with the Google AI plugin, opens the database, builds the research flow you wired in Step 5 and passes it to `ResearchRoutes`. `googleAI()` reads your key from `GOOGLE_API_KEY`.
 
+The `RelicApp` part is the server itself. `use` adds middleware that runs on every request, here CORS and request logging. `any('/**', ...)` sends every path to your router, and `serve` starts listening on the port.
+
 **Test it live** from the repository root. First stop the starter server from Step 0 (Ctrl+C in its terminal), because it still holds port 8080. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..`.
 
 ```sh
@@ -821,7 +821,7 @@ You now have a working agent that answers from real query results.
 | **3 tools**          | Explore a database: list tables, describe schema, run queries   |
 | **Message helper**   | List the tools the agent called, for the app's trace            |
 | **Research agent**   | A tool loop that ends in a structured answer                    |
-| **Composition root** | Wire all dependencies together                                  |
+| **Setup**            | Create the tools and the agent, and connect them                |
 | **Route handler**    | Connect the agent flow to the HTTP endpoint                     |
 
 ### Try these questions

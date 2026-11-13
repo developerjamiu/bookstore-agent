@@ -143,7 +143,7 @@ Each component has a clear role, and you'll build them bottom-up: schemas first,
 
 ## Step 1: Define the Schemas
 
-First you define the shape of the data your tools take and your agent returns. Genkit sends the tool input schemas and `ResearchOutput` to the model, so their `description` strings are instructions, not comments.
+First, define the shape of the data your tools take and your agent returns. Genkit sends the tool input schemas and `ResearchOutput` to the model, so their `description` strings are instructions, not comments.
 
 We use [Schemantic](https://pub.dev/packages/schemantic), a code generator: you write an abstract `$TableNameInput`, and it generates the real `TableNameInput` class, with `fromJson`, `toJson` and the `$schema` Genkit reads, into the `part` file.
 
@@ -251,7 +251,7 @@ abstract class $ResearchResult {
 }
 ```
 
-> **Why two output schemas?** `ResearchOutput` is the answer the model writes in Step 4. `ResearchResult` is what the server returns: the same fields plus `toolCalls`, which your code collects, not the model.
+> **Why two output schemas?** `ResearchOutput` is the answer the model writes in Step 4's synthesis phase. `ResearchResult` is what the server returns: the same fields plus `toolCalls`, which your code collects, not the model.
 
 ### Generate the code
 
@@ -262,18 +262,18 @@ cd packages/dart_server
 dart run build_runner build
 ```
 
-**Verify:** `ls lib/src/schemas` shows five `.g.dart` files, and `dart analyze` prints `No issues found!`. If it says a URI "hasn't been generated", rerun build_runner.
+**Verify:** `ls lib/src/schemas` shows five `.g.dart` files, and `dart analyze` prints `No issues found!`. If it reports a URI "hasn't been generated", rerun build_runner.
 
 ---
 
 ## Step 2: Build the Database Tools
 
-Now build the three tools. Each gets `ai` and `db` through its constructor instead of creating them (dependency injection), so tests can pass in their own. `call()` registers the tool with Genkit, and a plain method (`list`, `describe`, `query`) holds the logic, which tests call without a model.
+Now build the three tools. Each gets `ai` and `db` through its constructor instead of creating them (dependency injection), so tests can pass their own. `call()` registers the tool with Genkit, and a plain method (`list`, `describe`, `query`) holds the logic, which tests call without a model.
 
 Two pieces of syntax are new:
 
 - `required this._ai` fills the private field `_ai` from a named parameter, new in Dart 3.12. Callers still write `ai:`.
-- A Genkit 1.0 tool function returns a `ToolResult`, and `.response(...)` is short for `ToolResult.response(...)`: Dart drops the class name when it knows the type.
+- A Genkit 1.0 tool function returns a `ToolResult`, and `.response(...)` is short for `ToolResult.response(...)`: Dart lets you drop the class name when it knows the type.
 
 ### ListTablesTool
 
@@ -937,7 +937,7 @@ curl -s http://localhost:8080/api/research \
   -d '{"question":"Which genre has the most tracks?"}' | jq
 ```
 
-You should see an answer naming Rock (31 tracks), the SQL behind it in `sources`, and `toolCalls` showing the agent's exploration sequence. The wording varies from run to run. Open the Flutter app and try it there too: the placeholder is gone.
+You should see an answer naming Rock (31 tracks), the SQL behind it in `sources`, and `toolCalls` showing the agent's exploration sequence. The wording varies by run. Open the Flutter app and try it there too: the placeholder is gone.
 
 If curl prints `Agent failed. Check server logs for details.` and the server log says `apiKey must be set to an API key`, the server can't see your key: export it in the server's terminal and restart.
 

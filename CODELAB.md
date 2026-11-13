@@ -1,8 +1,8 @@
 # Build Your First AI Agent with Genkit
 
-Learn to build a Dart server that uses Genkit to create an autonomous AI agent. The agent explores a music store database by choosing which tools to call, writing SQL queries, and answering natural-language questions — all without being told what to do step by step.
+An AI agent doesn't just answer from memory: it looks things up. In this codelab, you'll build one with Genkit and Dart. Ask it a question about a store's database, and it decides which tables to look at, writes its own SQL, and explains the answer, with the queries to prove it.
 
-This is not a chatbot. It's an **agent** — an LLM that sits in a loop, picks tools, observes results, and decides what to do next.
+Under the hood, it's a loop: the model picks a tool, looks at the result, and decides what to do next.
 
 **What you'll learn:**
 

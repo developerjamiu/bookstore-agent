@@ -2,7 +2,7 @@
 
 An AI agent doesn't just answer from memory: it looks things up. In this codelab, you'll build one with Genkit and Dart. Ask it a question about a store's database, and it decides which tables to look at, writes its own SQL, and explains the answer, with the queries to prove it.
 
-Under the hood, it's a loop: the model picks a tool, looks at the result, and decides what to do next.
+This is not a chatbot. It's an **agent**: an LLM that sits in a loop, picks tools, observes results, and decides what to do next.
 
 **What you'll learn:**
 

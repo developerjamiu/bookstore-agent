@@ -478,7 +478,9 @@ class RunQueryTool {
 
 ## Step 3: Build the Message Helpers
 
-Create `packages/dart_server/lib/src/utils/message_helpers.dart`, with two helpers that read the agent's conversation. `extractToolCalls` lists the tools it called, for the app's trace. `buildResearchNotes` collects the query results, for Phase 2 in Step 4:
+While the agent works, Genkit records everything in a conversation: the question, each tool the model asks for, and each result your tools return. The agent you build in Step 4 needs two things from that conversation, so you'll write a helper for each.
+
+Create `packages/dart_server/lib/src/utils/message_helpers.dart`:
 
 ````dart
 import 'dart:convert';
@@ -487,7 +489,7 @@ import 'package:genkit/genkit.dart';
 
 import '../schemas/tool_call.dart';
 
-/// Extracts all tool requests from a conversation as [ToolCall] records.
+/// Lists every tool the model asked for, in order, for the app's trace.
 ///
 /// ```
 /// [ToolCall(tool: "listTables", input: "{}"),
@@ -514,10 +516,10 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
   return calls;
 }
 
-/// Builds synthesis-ready notes from a completed research response.
+/// Builds the notes Phase 2 turns into an answer.
 ///
-/// Includes only `runQuery` results (not schema exploration output)
-/// paired with the SQL that produced them, plus the agent's summary.
+/// Keeps only `runQuery` results, each under the SQL that produced it,
+/// then adds the model's own summary.
 ///
 /// ```
 /// [Query: SELECT Name FROM artists LIMIT 3]
@@ -581,9 +583,11 @@ String? _findQueryForResponse(
 }
 ````
 
-> Notice: `ai.generate()` returns a `GenerateResult`, and its `messages` hold the whole conversation. Model messages ask for tools, and tool messages carry the results. A result doesn't include the SQL that produced it, so `_findQueryForResponse` finds the matching request through their shared `ref` id.
+What each function does:
 
-> **Why filter out `listTables` and `describeTable` results?** The synthesis phase only needs query results to write its answer. Schema exploration output adds cost and can confuse the model.
+- `extractToolCalls` lists every tool the model asked for, with its input. The app shows this list as the agent trace.
+- `buildResearchNotes` keeps only the `runQuery` results, each under its SQL. In Step 4, the model writes the final answer from these notes. It skips `listTables` and `describeTable` output, which the answer doesn't need.
+- `_findQueryForResponse` supports it: a result doesn't carry its SQL, so this finds the matching request through their shared `ref` id.
 
 **Verify:** `dart analyze` prints `No issues found!`
 

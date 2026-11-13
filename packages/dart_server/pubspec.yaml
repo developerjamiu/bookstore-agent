@@ -1,5 +1,5 @@
 name: dart_server
-description: Shelf server with a Genkit database agent.
+description: Relic server with a Genkit database agent.
 publish_to: none
 version: 0.1.0
 
@@ -11,9 +11,8 @@ resolution: workspace
 dependencies:
   genkit: ^0.12.1
   genkit_google_genai: ^0.2.4
+  relic: ^2.0.0
   schemantic: ^0.1.1
-  shelf: ^1.4.2
-  shelf_router: ^1.1.4
   sqlite3: ^3.1.0
 
 dev_dependencies:

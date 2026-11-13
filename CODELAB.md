@@ -35,6 +35,8 @@ dart pub get
 
 The starter project includes a **complete Flutter app** and a **Dart server skeleton**. The server currently returns placeholder data — your job is to build the AI agent that powers it.
 
+The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP server framework. Some of it is pre-built scaffolding you won't change: `packages/dart_server/lib/src/app.dart` defines `buildApp`, which puts CORS and request logging in front of your routes, and `packages/dart_server/lib/src/utils/request_helpers.dart` parses JSON bodies and builds JSON responses.
+
 **Browse the database:**
 
 Open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) extension. You'll see 9 tables: artists, albums, tracks, genres, customers, invoices, invoice_lines, playlists, and playlist_tracks. This is the data your agent will explore.
@@ -44,6 +46,8 @@ Open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite View
 ```sh
 dart run packages/dart_server/bin/server.dart
 ```
+
+The server listens on port 8080 because the Flutter client calls `http://localhost:8080` (`http://10.0.2.2:8080` on the Android emulator). To listen on another port, set `PORT`, for example `PORT=8081 dart run packages/dart_server/bin/server.dart`. The client still calls 8080, so use another port only for curl testing.
 
 **Test it with curl:**
 
@@ -106,7 +110,9 @@ Here's what you'll build to make this work:
 ```
 User question
     |
-bin/server.dart (opens DB, creates Genkit, starts Shelf)
+bin/server.dart (opens DB, creates Genkit, starts Relic)
+    |
+app.dart (pre-built: CORS + request logging)
     |
 routes/research.dart (receives POST, calls the agent flow)
     |
@@ -797,8 +803,7 @@ Replace the placeholder in `packages/dart_server/lib/src/routes/research.dart`:
 
 ```dart
 import 'package:genkit/genkit.dart';
-import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
+import 'package:relic/relic.dart';
 
 import '../schemas/research_result.dart';
 import '../utils/request_helpers.dart';
@@ -811,8 +816,8 @@ class ResearchRoutes {
   ResearchRoutes({required ResearchFlow researchFlow})
     : _researchFlow = researchFlow;
 
-  Router get router {
-    final router = Router();
+  RelicRouter get router {
+    final router = RelicRouter();
     router.post('/api/research', _research);
     return router;
   }
@@ -839,6 +844,10 @@ class ResearchRoutes {
 }
 ```
 
+The `RelicRouter` and the request validation stay as they were in the placeholder. A `RelicRouter` maps a method and a path to a handler: `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, for example a 429 when your API quota runs out.
+
+Until you update the entrypoint in Step 7, `dart analyze` reports a missing `researchFlow` argument in `bin/server.dart`. That is expected.
+
 ---
 
 ## Step 7: Update the Server Entrypoint
@@ -850,15 +859,21 @@ import 'dart:io';
 
 import 'package:genkit/genkit.dart';
 import 'package:genkit_google_genai/genkit_google_genai.dart';
-import 'package:shelf/shelf.dart';
-import 'package:shelf/shelf_io.dart' as io;
+import 'package:relic/relic.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'package:dart_server/src/agent/setup.dart';
-import 'package:dart_server/src/middleware/cors.dart';
+import 'package:dart_server/src/app.dart';
 import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
+  final portText = Platform.environment['PORT'] ?? '8080';
+  final port = int.tryParse(portText);
+  if (port == null || port < 0 || port > 65535) {
+    stderr.writeln('PORT must be a number from 0 to 65535, got "$portText".');
+    exit(1);
+  }
+
   final dbPath = Platform.script.resolve('../data/music_store.db').toFilePath();
   if (!File(dbPath).existsSync()) {
     stderr.writeln('Database not found at $dbPath.');
@@ -871,12 +886,9 @@ Future<void> main() async {
 
   final researchRoutes = ResearchRoutes(researchFlow: researchFlow);
 
-  final handler = const Pipeline()
-      .addMiddleware(cors())
-      .addMiddleware(logRequests())
-      .addHandler(researchRoutes.router.call);
+  final app = buildApp(researchRoutes.router);
 
-  final server = await io.serve(handler, '0.0.0.0', 8080);
+  final server = await app.serve(address: InternetAddress.anyIPv4, port: port);
   print('');
   print('Server running on http://localhost:${server.port}');
   print('');
@@ -888,7 +900,9 @@ Future<void> main() async {
 }
 ```
 
-**Test it live:**
+The `PORT` check, `buildApp` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `buildApp` comes from the pre-built `packages/dart_server/lib/src/app.dart`: it mounts your router behind the CORS and request-logging middleware, so every response gets CORS headers, including the 404 and 405 answers for unknown paths and methods. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
+
+**Test it live** from the repository root. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..` first.
 
 ```sh
 export GOOGLE_API_KEY=your-key-here

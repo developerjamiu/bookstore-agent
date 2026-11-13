@@ -72,7 +72,8 @@ class ResearchAgent {
     // so the notes come from the queries the agent really ran. With no query
     // results at all, there is nothing true to synthesize from.
     final outOfTurns = researchResponse.finishReason == FinishReason.aborted;
-    if (outOfTurns && !hasQueryResults(researchResponse.messages)) {
+    final hasResults = hasQueryResults(researchResponse.messages);
+    if (outOfTurns && !hasResults) {
       return ResearchResult(
         answer: _outOfTurnsAnswer,
         sources: const [],
@@ -84,10 +85,14 @@ class ResearchAgent {
     final notes = buildResearchNotes(researchResponse);
     final synthesis = await _runSynthesisPhase(question, notes);
 
+    // With no query results, nothing in the answer came from the database,
+    // so it cannot be confident and has no query to cite. A refusal such as
+    // "I have no weather data" ends here, and the synthesis model tends to
+    // rate a clear refusal as high confidence.
     return ResearchResult(
       answer: synthesis.answer,
-      sources: synthesis.sources,
-      confidence: synthesis.confidence,
+      sources: hasResults ? synthesis.sources : const [],
+      confidence: hasResults ? synthesis.confidence : 'low',
       toolCalls: toolCalls,
     );
   }

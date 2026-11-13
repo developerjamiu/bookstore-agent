@@ -112,6 +112,40 @@ void main() {
 
       expect(result.confidence, 'low');
     });
+
+    test('returns low confidence and no sources when no query ran, even if '
+        'synthesis says high', () async {
+      ai.defineModel(
+        name: 'fake/refuses',
+        fn: (request, _) async => _textResponse(
+          request.output != null
+              ? jsonEncode({
+                  'answer': 'I have no weather data.',
+                  'sources': ['SELECT 1'],
+                  'confidence': 'high',
+                })
+              : 'The database has no weather data.',
+        ),
+      );
+
+      final result = await agentFor(
+        'fake/refuses',
+      ).research('What is the weather in Paris?');
+
+      expect(result.answer, 'I have no weather data.');
+      expect(result.confidence, 'low');
+      expect(result.sources, isEmpty);
+    });
+
+    test('returns low confidence when every query failed', () async {
+      runQueryOutput = 'SQL error: no such table: weather';
+
+      final result = await agent.research('What artists are in the database?');
+
+      expect(result.toolCalls.map((c) => c.tool), contains('runQuery'));
+      expect(result.confidence, 'low');
+      expect(result.sources, isEmpty);
+    });
   });
 
   group('ResearchAgent out of turns', () {

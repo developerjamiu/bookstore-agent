@@ -75,11 +75,11 @@ base class _ResearchOutputTypeFactory extends SchemanticType<ResearchOutput> {
     name: 'ResearchOutput',
     definition: <String, Object?>{
       'type': 'object',
-      'description': 'Synthesized answer produced by the research agent',
+      'description': 'The answer Gemini writes from the query results',
       'properties': <String, Object?>{
         'answer': <String, Object?>{
           'type': 'string',
-          'description': 'The synthesized answer to the question',
+          'description': 'The answer to the question',
         },
         'sources': <String, Object?>{
           'type': 'array',

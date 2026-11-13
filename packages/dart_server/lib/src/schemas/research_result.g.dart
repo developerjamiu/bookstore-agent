@@ -91,11 +91,11 @@ base class _ResearchResultTypeFactory extends SchemanticType<ResearchResult> {
     name: 'ResearchResult',
     definition: <String, Object?>{
       'type': 'object',
-      'description': 'Final result returned by the research agent flow',
+      'description': 'The answer the server sends back to the app',
       'properties': <String, Object?>{
         'answer': <String, Object?>{
           'type': 'string',
-          'description': 'The synthesized answer to the question',
+          'description': 'The answer to the question',
         },
         'sources': <String, Object?>{
           'type': 'array',
@@ -109,7 +109,7 @@ base class _ResearchResultTypeFactory extends SchemanticType<ResearchResult> {
         },
         'toolCalls': <String, Object?>{
           'type': 'array',
-          'description': 'Tools the agent invoked while researching',
+          'description': 'The tools the agent called, in order',
           'items': <String, Object?>{r'$ref': r'#/$defs/ToolCall'},
         },
       },

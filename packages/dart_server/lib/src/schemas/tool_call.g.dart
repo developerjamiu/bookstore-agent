@@ -61,15 +61,15 @@ base class _ToolCallTypeFactory extends SchemanticType<ToolCall> {
     name: 'ToolCall',
     definition: <String, Object?>{
       'type': 'object',
-      'description': 'A tool invocation made by the research agent',
+      'description': 'A tool the agent called',
       'properties': <String, Object?>{
         'tool': <String, Object?>{
           'type': 'string',
-          'description': 'Name of the tool that was called',
+          'description': 'The name of the tool',
         },
         'input': <String, Object?>{
           'type': 'string',
-          'description': 'JSON-encoded input passed to the tool',
+          'description': 'What the agent sent to the tool, as JSON text',
         },
       },
       'required': ['tool', 'input'],

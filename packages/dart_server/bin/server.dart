@@ -20,7 +20,7 @@ Future<void> main() async {
   final researchFlow = createResearchFlow(ai: ai, db: sqlite3.open(dbPath));
   final routes = ResearchRoutes(researchFlow: researchFlow);
 
-  // Mounted for every path so cors() also reaches preflights and 404/405s.
+  // Every path goes to the router, so the middleware runs on every request.
   final app = RelicApp()
     ..use('/', cors())
     ..use('/', logRequests())

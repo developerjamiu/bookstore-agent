@@ -314,7 +314,7 @@ class ListTablesTool {
 }
 ````
 
-> Notice: `.response(...)` wraps the tool's result in the type Genkit expects (it's short for `ToolResult.response(...)`). `required this._ai` stores the `ai` you pass in a private field, `_ai`. You still create the tool without the underscore: `ListTablesTool(ai: ai, db: db)`.
+> Notice: a Genkit tool returns its result wrapped in `.response(...)` (short for `ToolResult.response(...)`). Any tool you add later needs the same.
 
 ### DescribeTableTool
 

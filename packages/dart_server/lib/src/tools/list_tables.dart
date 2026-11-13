@@ -27,9 +27,9 @@ class ListTablesTool {
   ///
   /// ```
   /// Tables in the database:
-  /// - albums
-  /// - artists
-  /// - tracks
+  /// - authors
+  /// - books
+  /// - customers
   /// ```
   Future<String> list() async {
     final result = _db.select(

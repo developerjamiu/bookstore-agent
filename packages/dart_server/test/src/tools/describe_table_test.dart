@@ -23,28 +23,28 @@ void main() {
 
   group('DescribeTableTool', () {
     test('returns columns with types and constraints', () async {
-      final result = await tool.describe(TableNameInput(table: 'tracks'));
+      final result = await tool.describe(TableNameInput(table: 'books'));
 
-      expect(result, contains('TrackId INTEGER'));
+      expect(result, contains('BookId INTEGER'));
       expect(result, contains('PRIMARY KEY'));
-      expect(result, contains('Name TEXT NOT NULL'));
-      expect(result, contains('AlbumId INTEGER'));
-      expect(result, contains('Milliseconds INTEGER NOT NULL'));
-      expect(result, contains('UnitPrice REAL NOT NULL'));
+      expect(result, contains('Title TEXT NOT NULL'));
+      expect(result, contains('PublisherId INTEGER'));
+      expect(result, contains('Pages INTEGER NOT NULL'));
+      expect(result, contains('Price REAL NOT NULL'));
     });
 
     test('includes foreign key relationships', () async {
-      final result = await tool.describe(TableNameInput(table: 'tracks'));
+      final result = await tool.describe(TableNameInput(table: 'books'));
 
       expect(result, contains('Foreign keys:'));
-      expect(result, contains('AlbumId -> albums(AlbumId)'));
+      expect(result, contains('AuthorId -> authors(AuthorId)'));
       expect(result, contains('GenreId -> genres(GenreId)'));
     });
 
     test('omits foreign keys section when table has none', () async {
-      final result = await tool.describe(TableNameInput(table: 'artists'));
+      final result = await tool.describe(TableNameInput(table: 'authors'));
 
-      expect(result, contains('ArtistId'));
+      expect(result, contains('AuthorId'));
       expect(result, contains('Name'));
       expect(result, isNot(contains('Foreign keys:')));
     });
@@ -57,13 +57,13 @@ void main() {
 
     test('rejects SQL injection attempts', () async {
       final result = await tool.describe(
-        TableNameInput(table: '"; DROP TABLE artists; --'),
+        TableNameInput(table: '"; DROP TABLE authors; --'),
       );
 
       expect(result, contains('does not exist'));
 
-      final artists = db.select('SELECT COUNT(*) as n FROM artists');
-      expect(artists.first['n'] as int, greaterThan(0));
+      final authors = db.select('SELECT COUNT(*) as n FROM authors');
+      expect(authors.first['n'] as int, greaterThan(0));
     });
   });
 }

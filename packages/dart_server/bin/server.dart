@@ -10,7 +10,7 @@ import 'package:dart_server/src/middleware/cors.dart';
 import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
-  final dbPath = Platform.script.resolve('../data/music_store.db').toFilePath();
+  final dbPath = Platform.script.resolve('../data/bookstore.db').toFilePath();
   if (!File(dbPath).existsSync()) {
     stderr.writeln('Database not found at $dbPath.');
     exit(1);

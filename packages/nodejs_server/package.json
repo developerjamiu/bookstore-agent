@@ -2,7 +2,7 @@
   "name": "research-assistant-server-js",
   "version": "0.1.0",
   "private": true,
-  "description": "Music store research agent (Node.js + Genkit)",
+  "description": "Bookstore research agent (Node.js + Genkit)",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

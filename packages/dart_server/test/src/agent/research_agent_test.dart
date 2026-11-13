@@ -25,9 +25,9 @@ void main() {
   setUp(() {
     ai = Genkit();
     runQueryOutput = jsonEncode([
-      {'Name': 'AC/DC'},
-      {'Name': 'Led Zeppelin'},
-      {'Name': 'Queen'},
+      {'Name': 'Jane Austen'},
+      {'Name': 'Charles Dickens'},
+      {'Name': 'Mark Twain'},
     ]);
 
     ai.defineModel(
@@ -41,7 +41,7 @@ void main() {
       inputSchema: SchemanticType.voidSchema(),
       outputSchema: SchemanticType.string(),
       fn: (_, _) async => .response(
-        'Tables in the database:\n- artists\n- albums\n- tracks\n- genres',
+        'Tables in the database:\n- authors\n- books\n- genres\n- orders',
       ),
     );
 
@@ -52,7 +52,7 @@ void main() {
       outputSchema: SchemanticType.string(),
       fn: (input, _) async => .response(
         'Columns in "${input.table}":\n'
-        '- ArtistId INTEGER PRIMARY KEY\n'
+        '- AuthorId INTEGER PRIMARY KEY\n'
         '- Name TEXT NOT NULL',
       ),
     );
@@ -80,14 +80,14 @@ void main() {
 
   group('ResearchAgent', () {
     test('answers a database question with high confidence', () async {
-      final result = await agent.research('What artists are in the database?');
+      final result = await agent.research('What authors are in the database?');
 
       expect(result.confidence, 'high');
-      expect(result.answer, contains('AC/DC'));
+      expect(result.answer, contains('Jane Austen'));
     });
 
     test('records the exploration sequence', () async {
-      final result = await agent.research('What artists are in the database?');
+      final result = await agent.research('What authors are in the database?');
 
       final toolNames = result.toolCalls.map((c) => c.tool).toList();
       expect(toolNames, contains('listTables'));
@@ -107,7 +107,7 @@ void main() {
 
       await agentFor(
         'fake/recording',
-      ).research('What artists are in the database?');
+      ).research('What authors are in the database?');
 
       expect(requests, hasLength(4));
       for (final request in requests) {
@@ -117,7 +117,7 @@ void main() {
     });
 
     test('includes SQL queries in sources', () async {
-      final result = await agent.research('What artists are in the database?');
+      final result = await agent.research('What authors are in the database?');
 
       expect(result.sources, isNotEmpty);
       expect(result.sources.first, contains('SELECT'));
@@ -186,13 +186,13 @@ void main() {
           (turn) => ToolRequest(
             ref: 'q$turn',
             name: 'runQuery',
-            input: {'sql': 'SELECT Name FROM artists LIMIT $turn'},
+            input: {'sql': 'SELECT Name FROM authors LIMIT $turn'},
           ),
         );
 
         final result = await agentFor(
           'fake/endless-queries',
-        ).research('What artists are in the database?');
+        ).research('What authors are in the database?');
 
         expect(result.answer, outOfTurnsAnswer);
         expect(result.confidence, 'low');
@@ -210,7 +210,7 @@ void main() {
 
       final result = await agentFor(
         'fake/endless-exploring',
-      ).research('What artists are in the database?');
+      ).research('What authors are in the database?');
 
       expect(result.answer, outOfTurnsAnswer);
       expect(result.confidence, 'low');
@@ -230,7 +230,7 @@ void main() {
       );
 
       await expectLater(
-        agentFor('fake/overloaded').research('How many artists?'),
+        agentFor('fake/overloaded').research('How many authors?'),
         throwsA(
           isA<GenkitException>()
               .having((e) => e.status, 'status', StatusCode.unavailable)
@@ -248,7 +248,7 @@ void main() {
         );
 
         await expectLater(
-          agentFor('fake/broken').research('How many artists?'),
+          agentFor('fake/broken').research('How many authors?'),
           throwsA(
             isA<GenkitException>()
                 .having((e) => e.status, 'status', StatusCode.internal)
@@ -277,7 +277,7 @@ void main() {
                 ToolRequestPart(
                   toolRequest: ToolRequest(
                     name: 'failingRunQuery',
-                    input: const {'sql': 'SELECT Name FROM artists'},
+                    input: const {'sql': 'SELECT Name FROM authors'},
                   ),
                 ),
               ],
@@ -289,7 +289,7 @@ void main() {
         agentFor(
           'fake/query-first',
           runQueryTool: failingRunQuery,
-        ).research('How many artists?'),
+        ).research('How many authors?'),
         throwsA(
           isA<GenkitException>()
               .having((e) => e.status, 'status', StatusCode.internal)
@@ -311,7 +311,7 @@ void main() {
       );
 
       await expectLater(
-        agentFor('fake/prose').research('How many artists?'),
+        agentFor('fake/prose').research('How many authors?'),
         throwsA(
           isA<GenkitException>().having(
             (e) => e.message,
@@ -331,7 +331,7 @@ void main() {
       // The JSON parses, so Genkit returns it as output, and the mistyped
       // field throws when read. The route maps any error to 500.
       await expectLater(
-        agentFor('fake/wrong-shape').research('How many artists?'),
+        agentFor('fake/wrong-shape').research('How many authors?'),
         throwsA(isA<TypeError>()),
       );
     });
@@ -377,7 +377,7 @@ ModelResponse _toolCallingResponse(ModelRequest request) {
           ToolRequestPart(
             toolRequest: ToolRequest(
               name: 'describeTable',
-              input: const {'table': 'artists'},
+              input: const {'table': 'authors'},
             ),
           ),
         ],
@@ -394,7 +394,7 @@ ModelResponse _toolCallingResponse(ModelRequest request) {
           ToolRequestPart(
             toolRequest: ToolRequest(
               name: 'runQuery',
-              input: const {'sql': 'SELECT Name FROM artists LIMIT 3'},
+              input: const {'sql': 'SELECT Name FROM authors LIMIT 3'},
             ),
           ),
         ],
@@ -428,9 +428,9 @@ ModelResponse _structuredResponse(ModelRequest request) {
   } else {
     output = {
       'answer':
-          'The database contains the following artists: AC/DC, Led Zeppelin, '
-          'and Queen (among others).',
-      'sources': const ['SELECT Name FROM artists LIMIT 3'],
+          'The database contains the following authors: Jane Austen, '
+          'Charles Dickens, and Mark Twain (among others).',
+      'sources': const ['SELECT Name FROM authors LIMIT 3'],
       'confidence': 'high',
     };
   }

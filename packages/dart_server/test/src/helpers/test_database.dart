@@ -4,15 +4,16 @@ Database createSeedDatabase({String? path}) {
   final db = path != null ? sqlite3.open(path) : sqlite3.openInMemory();
 
   db.execute('''
-    CREATE TABLE artists (
-      ArtistId INTEGER PRIMARY KEY,
-      Name TEXT NOT NULL
+    CREATE TABLE authors (
+      AuthorId INTEGER PRIMARY KEY,
+      Name TEXT NOT NULL,
+      Country TEXT
     );
 
-    CREATE TABLE albums (
-      AlbumId INTEGER PRIMARY KEY,
-      Title TEXT NOT NULL,
-      ArtistId INTEGER NOT NULL REFERENCES artists(ArtistId)
+    CREATE TABLE publishers (
+      PublisherId INTEGER PRIMARY KEY,
+      Name TEXT NOT NULL,
+      City TEXT
     );
 
     CREATE TABLE genres (
@@ -20,15 +21,15 @@ Database createSeedDatabase({String? path}) {
       Name TEXT NOT NULL
     );
 
-    CREATE TABLE tracks (
-      TrackId INTEGER PRIMARY KEY,
-      Name TEXT NOT NULL,
-      AlbumId INTEGER REFERENCES albums(AlbumId),
+    CREATE TABLE books (
+      BookId INTEGER PRIMARY KEY,
+      Title TEXT NOT NULL,
+      AuthorId INTEGER NOT NULL REFERENCES authors(AuthorId),
+      PublisherId INTEGER REFERENCES publishers(PublisherId),
       GenreId INTEGER REFERENCES genres(GenreId),
-      Composer TEXT,
-      Milliseconds INTEGER NOT NULL,
-      Bytes INTEGER,
-      UnitPrice REAL NOT NULL
+      PublishedYear INTEGER,
+      Pages INTEGER NOT NULL,
+      Price REAL NOT NULL
     );
 
     CREATE TABLE customers (
@@ -40,401 +41,306 @@ Database createSeedDatabase({String? path}) {
       Country TEXT
     );
 
-    CREATE TABLE invoices (
-      InvoiceId INTEGER PRIMARY KEY,
+    CREATE TABLE orders (
+      OrderId INTEGER PRIMARY KEY,
       CustomerId INTEGER NOT NULL REFERENCES customers(CustomerId),
-      InvoiceDate TEXT NOT NULL,
+      OrderDate TEXT NOT NULL,
       Total REAL NOT NULL
     );
 
-    CREATE TABLE invoice_lines (
-      InvoiceLineId INTEGER PRIMARY KEY,
-      InvoiceId INTEGER NOT NULL REFERENCES invoices(InvoiceId),
-      TrackId INTEGER NOT NULL REFERENCES tracks(TrackId),
+    CREATE TABLE order_items (
+      OrderItemId INTEGER PRIMARY KEY,
+      OrderId INTEGER NOT NULL REFERENCES orders(OrderId),
+      BookId INTEGER NOT NULL REFERENCES books(BookId),
       UnitPrice REAL NOT NULL,
       Quantity INTEGER NOT NULL
     );
 
-    CREATE TABLE playlists (
-      PlaylistId INTEGER PRIMARY KEY,
+    CREATE TABLE reading_lists (
+      ReadingListId INTEGER PRIMARY KEY,
       Name TEXT NOT NULL
     );
 
-    CREATE TABLE playlist_tracks (
-      PlaylistId INTEGER NOT NULL REFERENCES playlists(PlaylistId),
-      TrackId INTEGER NOT NULL REFERENCES tracks(TrackId),
-      PRIMARY KEY (PlaylistId, TrackId)
+    CREATE TABLE reading_list_books (
+      ReadingListId INTEGER NOT NULL REFERENCES reading_lists(ReadingListId),
+      BookId INTEGER NOT NULL REFERENCES books(BookId),
+      PRIMARY KEY (ReadingListId, BookId)
     );
   ''');
 
-  _seedArtists(db);
-  _seedGenres(db);
-  _seedAlbums(db);
-  _seedTracks(db);
-  _seedCustomers(db);
-  _seedInvoices(db);
-  _seedPlaylists(db);
+  _insert(db, 'authors', _authors);
+  _insert(db, 'publishers', _publishers);
+  _insert(db, 'genres', _genres);
+  _insert(db, 'books', _books);
+  _insert(db, 'customers', _customers);
+  _insert(db, 'orders', _orders);
+  _insert(db, 'order_items', _orderItems);
+  _insert(db, 'reading_lists', _readingLists);
+  _insert(db, 'reading_list_books', _readingListBooks);
 
   return db;
 }
 
-void _seedArtists(Database db) {
-  const artists = [
-    [1, 'AC/DC'],
-    [2, 'Led Zeppelin'],
-    [3, 'Metallica'],
-    [4, 'U2'],
-    [5, 'Queen'],
-    [6, 'Pink Floyd'],
-    [7, 'The Beatles'],
-    [8, 'Nirvana'],
-    [9, 'Miles Davis'],
-    [10, 'John Coltrane'],
-    [11, 'Bob Marley'],
-    [12, 'Adele'],
-    [13, 'Radiohead'],
-    [14, 'Daft Punk'],
-    [15, 'Amy Winehouse'],
-  ];
-  final stmt = db.prepare('INSERT INTO artists VALUES (?, ?)');
-  for (final a in artists) {
-    stmt.execute(a);
+void _insert(Database db, String table, List<List<Object>> rows) {
+  final placeholders = List.filled(rows.first.length, '?').join(', ');
+  final stmt = db.prepare('INSERT INTO $table VALUES ($placeholders)');
+  for (final row in rows) {
+    stmt.execute(row);
   }
   stmt.close();
 }
 
-void _seedGenres(Database db) {
-  const genres = [
-    [1, 'Rock'],
-    [2, 'Jazz'],
-    [3, 'Metal'],
-    [4, 'Pop'],
-    [5, 'Reggae'],
-    [6, 'Electronic'],
-    [7, 'Blues'],
-  ];
-  final stmt = db.prepare('INSERT INTO genres VALUES (?, ?)');
-  for (final g in genres) {
-    stmt.execute(g);
-  }
-  stmt.close();
-}
+const _authors = [
+  [1, 'Jane Austen', 'England'],
+  [2, 'Charles Dickens', 'England'],
+  [3, 'Mark Twain', 'United States'],
+  [4, 'Agatha Christie', 'England'],
+  [5, 'Arthur Conan Doyle', 'Scotland'],
+  [6, 'Jules Verne', 'France'],
+  [7, 'H. G. Wells', 'England'],
+  [8, 'Louisa May Alcott', 'United States'],
+  [9, 'L. M. Montgomery', 'Canada'],
+  [10, 'Robert Louis Stevenson', 'Scotland'],
+  [11, 'Chinua Achebe', 'Nigeria'],
+  [12, 'Harper Lee', 'United States'],
+  [13, 'Dava Sobel', 'United States'],
+  [14, 'David McCullough', 'United States'],
+  [15, 'Laura Ingalls Wilder', 'United States'],
+];
 
-void _seedAlbums(Database db) {
-  const albums = [
-    [1, 'Back in Black', 1],
-    [2, 'Led Zeppelin IV', 2],
-    [3, 'Master of Puppets', 3],
-    [4, 'The Joshua Tree', 4],
-    [5, 'A Night at the Opera', 5],
-    [6, 'The Dark Side of the Moon', 6],
-    [7, 'Abbey Road', 7],
-    [8, 'Nevermind', 8],
-    [9, 'Kind of Blue', 9],
-    [10, 'A Love Supreme', 10],
-    [11, 'Legend', 11],
-    [12, '21', 12],
-    [13, 'OK Computer', 13],
-    [14, 'Random Access Memories', 14],
-    [15, 'Back to Black', 15],
-    [16, 'Highway to Hell', 1],
-    [17, 'Physical Graffiti', 2],
-    [18, 'Ride the Lightning', 3],
-    [19, 'Achtung Baby', 4],
-    [20, 'News of the World', 5],
-  ];
-  final stmt = db.prepare('INSERT INTO albums VALUES (?, ?, ?)');
-  for (final a in albums) {
-    stmt.execute(a);
-  }
-  stmt.close();
-}
+const _publishers = [
+  [1, 'Harbor Press', 'London'],
+  [2, 'Northwind Books', 'Edinburgh'],
+  [3, 'Blue Lantern', 'Boston'],
+  [4, 'Oakleaf Publishing', 'Toronto'],
+  [5, 'Summit House', 'New York'],
+];
 
-void _seedTracks(Database db) {
-  const tracks = [
-    [1, 'Hells Bells', 1, 1, 'Angus Young', 312000, 5100000, 0.99],
-    [2, 'Back in Black', 1, 1, 'Angus Young', 255000, 4200000, 0.99],
-    [
-      3,
-      'You Shook Me All Night Long',
-      1,
-      1,
-      'Angus Young',
-      210000,
-      3400000,
-      0.99,
-    ],
-    [4, 'Shoot to Thrill', 1, 1, 'Angus Young', 257000, 4200000, 0.99],
-    [5, 'Stairway to Heaven', 2, 1, 'Jimmy Page', 482000, 7900000, 0.99],
-    [6, 'Black Dog', 2, 1, 'Jimmy Page', 296000, 4800000, 0.99],
-    [7, 'Rock and Roll', 2, 1, 'Jimmy Page', 220000, 3600000, 0.99],
-    [8, 'Master of Puppets', 3, 3, 'James Hetfield', 516000, 8400000, 0.99],
-    [9, 'Battery', 3, 3, 'James Hetfield', 312000, 5100000, 0.99],
-    [
-      10,
-      'Welcome to the Jungle',
-      3,
-      3,
-      'James Hetfield',
-      275000,
-      4500000,
-      0.99,
-    ],
-    [11, 'Where the Streets Have No Name', 4, 1, 'U2', 336000, 5500000, 0.99],
-    [12, 'With or Without You', 4, 1, 'U2', 296000, 4800000, 0.99],
-    [
-      13,
-      'I Still Haven\'t Found What I\'m Looking For',
-      4,
-      1,
-      'U2',
-      281000,
-      4600000,
-      0.99,
-    ],
-    [14, 'Bohemian Rhapsody', 5, 1, 'Freddie Mercury', 354000, 5800000, 0.99],
-    [15, 'You\'re My Best Friend', 5, 4, 'John Deacon', 172000, 2800000, 0.99],
-    [16, 'Money', 6, 1, 'Roger Waters', 382000, 6200000, 0.99],
-    [17, 'Time', 6, 1, 'David Gilmour', 413000, 6700000, 0.99],
-    [18, 'Comfortably Numb', 6, 1, 'David Gilmour', 382000, 6200000, 0.99],
-    [19, 'Come Together', 7, 1, 'John Lennon', 259000, 4200000, 0.99],
-    [20, 'Here Comes the Sun', 7, 1, 'George Harrison', 185000, 3000000, 0.99],
-    [21, 'Something', 7, 1, 'George Harrison', 182000, 3000000, 0.99],
-    [22, 'Smells Like Teen Spirit', 8, 1, 'Kurt Cobain', 301000, 4900000, 0.99],
-    [23, 'Come as You Are', 8, 1, 'Kurt Cobain', 219000, 3600000, 0.99],
-    [24, 'Lithium', 8, 1, 'Kurt Cobain', 253000, 4100000, 0.99],
-    [25, 'So What', 9, 2, 'Miles Davis', 562000, 9200000, 0.99],
-    [26, 'Blue in Green', 9, 2, 'Miles Davis', 328000, 5400000, 0.99],
-    [27, 'Freddie Freeloader', 9, 2, 'Miles Davis', 590000, 9600000, 0.99],
-    [28, 'A Love Supreme Pt. 1', 10, 2, 'John Coltrane', 462000, 7500000, 0.99],
-    [29, 'A Love Supreme Pt. 2', 10, 2, 'John Coltrane', 425000, 6900000, 0.99],
-    [30, 'No Woman No Cry', 11, 5, 'Bob Marley', 285000, 4600000, 0.99],
-    [31, 'Could You Be Loved', 11, 5, 'Bob Marley', 236000, 3900000, 0.99],
-    [32, 'Jamming', 11, 5, 'Bob Marley', 213000, 3500000, 0.99],
-    [33, 'Rolling in the Deep', 12, 4, 'Adele', 228000, 3700000, 1.29],
-    [34, 'Someone Like You', 12, 4, 'Adele', 285000, 4600000, 1.29],
-    [35, 'Set Fire to the Rain', 12, 4, 'Adele', 242000, 3900000, 1.29],
-    [36, 'Paranoid Android', 13, 1, 'Thom Yorke', 383000, 6200000, 0.99],
-    [37, 'Karma Police', 13, 1, 'Thom Yorke', 263000, 4300000, 0.99],
-    [38, 'No Surprises', 13, 1, 'Thom Yorke', 229000, 3700000, 0.99],
-    [39, 'Get Lucky', 14, 6, 'Pharrell Williams', 369000, 6000000, 1.29],
-    [40, 'Instant Crush', 14, 6, 'Daft Punk', 337000, 5500000, 1.29],
-    [41, 'Rehab', 15, 4, 'Amy Winehouse', 213000, 3500000, 1.29],
-    [42, 'Back to Black', 15, 4, 'Amy Winehouse', 240000, 3900000, 1.29],
-    [43, 'Highway to Hell', 16, 1, 'Angus Young', 208000, 3400000, 0.99],
-    [44, 'Touch Too Much', 16, 1, 'Angus Young', 257000, 4200000, 0.99],
-    [45, 'Kashmir', 17, 1, 'Jimmy Page', 508000, 8300000, 0.99],
-    [46, 'Houses of the Holy', 17, 1, 'Jimmy Page', 242000, 3900000, 0.99],
-    [47, 'Ride the Lightning', 18, 3, 'James Hetfield', 397000, 6500000, 0.99],
-    [48, 'Fade to Black', 18, 3, 'James Hetfield', 416000, 6800000, 0.99],
-    [49, 'One', 19, 1, 'U2', 276000, 4500000, 0.99],
-    [50, 'Mysterious Ways', 19, 1, 'U2', 244000, 4000000, 0.99],
-    [51, 'We Will Rock You', 20, 1, 'Brian May', 122000, 2000000, 0.99],
-    [
-      52,
-      'We Are the Champions',
-      20,
-      1,
-      'Freddie Mercury',
-      181000,
-      2900000,
-      0.99,
-    ],
-  ];
-  final stmt = db.prepare('INSERT INTO tracks VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-  for (final t in tracks) {
-    stmt.execute(t);
-  }
-  stmt.close();
-}
+const _genres = [
+  [1, 'Classics'],
+  [2, 'Mystery'],
+  [3, 'Science Fiction'],
+  [4, 'Adventure'],
+  [5, "Children's"],
+  [6, 'History'],
+  [7, 'Biography'],
+];
 
-void _seedCustomers(Database db) {
-  const customers = [
-    [1, 'Luís', 'Gonçalves', 'luisg@embraer.com.br', 'São Paulo', 'Brazil'],
-    [2, 'Leonie', 'Köhler', 'leoniekohler@surfeu.de', 'Stuttgart', 'Germany'],
-    [3, 'François', 'Tremblay', 'ftremblay@gmail.com', 'Montréal', 'Canada'],
-    [4, 'Bjørn', 'Hansen', 'bjorn.hansen@yahoo.no', 'Oslo', 'Norway'],
-    [5, 'Helena', 'Holý', 'hholy@gmail.com', 'Prague', 'Czech Republic'],
-    [6, 'Astrid', 'Gruber', 'astrid.gruber@apple.at', 'Vienna', 'Austria'],
-    [7, 'Daan', 'Peeters', 'daan_peeters@apple.be', 'Brussels', 'Belgium'],
-    [8, 'Kara', 'Nielsen', 'kara.nielsen@jubii.dk', 'Copenhagen', 'Denmark'],
-    [9, 'Camille', 'Bernard', 'camille.bernard@yahoo.fr', 'Paris', 'France'],
-    [10, 'John', 'Smith', 'johnsmith@gmail.com', 'New York', 'USA'],
-  ];
-  final stmt = db.prepare('INSERT INTO customers VALUES (?, ?, ?, ?, ?, ?)');
-  for (final c in customers) {
-    stmt.execute(c);
-  }
-  stmt.close();
-}
+// BookId, Title, AuthorId, PublisherId, GenreId, PublishedYear, Pages, Price
+const _books = [
+  [1, 'Pride and Prejudice', 1, 1, 1, 1813, 432, 9.99],
+  [2, 'Emma', 1, 1, 1, 1815, 474, 9.99],
+  [3, 'Sense and Sensibility', 1, 1, 1, 1811, 409, 8.99],
+  [4, 'Persuasion', 1, 2, 1, 1817, 249, 7.99],
+  [5, 'Great Expectations', 2, 2, 1, 1861, 505, 10.99],
+  [6, 'Oliver Twist', 2, 2, 1, 1838, 554, 9.99],
+  [7, 'A Tale of Two Cities', 2, 1, 1, 1859, 489, 10.99],
+  [8, 'David Copperfield', 2, 3, 1, 1850, 882, 12.99],
+  [9, 'The Adventures of Tom Sawyer', 3, 3, 4, 1876, 274, 7.99],
+  [10, 'Adventures of Huckleberry Finn', 3, 3, 1, 1884, 366, 8.99],
+  [11, 'Little Women', 8, 4, 1, 1868, 759, 11.99],
+  [12, 'Things Fall Apart', 11, 5, 1, 1958, 209, 12.99],
+  [13, 'To Kill a Mockingbird', 12, 5, 1, 1960, 336, 14.99],
+  [14, 'The Murder of Roger Ackroyd', 4, 2, 2, 1926, 312, 11.99],
+  [15, 'Murder on the Orient Express', 4, 2, 2, 1934, 256, 11.99],
+  [16, 'The A.B.C. Murders', 4, 4, 2, 1936, 256, 10.99],
+  [17, 'The Hound of the Baskervilles', 5, 1, 2, 1902, 256, 8.99],
+  [18, 'A Study in Scarlet', 5, 1, 2, 1887, 188, 7.99],
+  [19, 'The Sign of the Four', 5, 4, 2, 1890, 166, 7.99],
+  [20, 'Twenty Thousand Leagues Under the Seas', 6, 3, 3, 1870, 426, 9.99],
+  [21, 'Journey to the Center of the Earth', 6, 3, 3, 1864, 240, 8.99],
+  [22, 'The Time Machine', 7, 4, 3, 1895, 118, 6.99],
+  [23, 'The War of the Worlds', 7, 4, 3, 1898, 192, 7.99],
+  [24, 'The First Men in the Moon', 7, 5, 3, 1901, 240, 7.99],
+  [25, 'Around the World in Eighty Days', 6, 3, 4, 1872, 252, 8.99],
+  [26, 'Treasure Island', 10, 1, 4, 1883, 292, 7.99],
+  [27, 'Kidnapped', 10, 2, 4, 1886, 288, 8.99],
+  [28, 'The Mysterious Island', 6, 5, 4, 1875, 640, 11.99],
+  [29, 'Anne of Green Gables', 9, 4, 5, 1908, 320, 8.99],
+  [30, 'Anne of Avonlea', 9, 4, 5, 1909, 304, 8.99],
+  [31, 'Little House in the Big Woods', 15, 5, 5, 1932, 238, 7.99],
+  [32, 'Little House on the Prairie', 15, 5, 5, 1935, 335, 7.99],
+  [33, 'Little Men', 8, 4, 5, 1871, 376, 9.99],
+  [34, 'Longitude', 13, 1, 6, 1995, 184, 13.99],
+  [35, '1776', 14, 2, 6, 2005, 386, 16.99],
+  [36, 'The Wright Brothers', 14, 2, 6, 2015, 336, 15.99],
+  [37, 'John Adams', 14, 3, 7, 2001, 751, 18.99],
+  [38, 'Truman', 14, 3, 7, 1992, 1117, 19.99],
+  [39, "Galileo's Daughter", 13, 1, 7, 1999, 420, 15.99],
+  [40, 'Death on the Nile', 4, 2, 2, 1937, 288, 11.99],
+  [41, 'The Valley of Fear', 5, 1, 2, 1915, 192, 8.99],
+  [42, 'From the Earth to the Moon', 6, 3, 3, 1865, 208, 8.99],
+  [43, 'The Invisible Man', 7, 4, 3, 1897, 176, 7.99],
+  [44, 'Michael Strogoff', 6, 3, 4, 1876, 384, 9.99],
+  [45, 'The Black Arrow', 10, 2, 4, 1888, 320, 8.99],
+  [46, 'Anne of the Island', 9, 4, 5, 1915, 272, 8.99],
+  [47, 'Farmer Boy', 15, 5, 5, 1933, 384, 7.99],
+  [48, 'The Great Bridge', 14, 5, 6, 1972, 636, 17.99],
+  [49, 'The Path Between the Seas', 14, 5, 6, 1977, 704, 18.99],
+  [50, 'The Glass Universe', 13, 1, 6, 2016, 336, 16.99],
+  [51, 'Mornings on Horseback', 14, 3, 7, 1981, 448, 15.99],
+  [52, 'A More Perfect Heaven', 13, 1, 7, 2011, 288, 16.99],
+];
 
-void _seedInvoices(Database db) {
-  const invoices = [
-    [1, 1, '2024-01-15', 5.94],
-    [2, 1, '2024-04-20', 3.96],
-    [3, 2, '2024-02-10', 8.91],
-    [4, 3, '2024-03-05', 1.98],
-    [5, 4, '2024-01-25', 13.86],
-    [6, 5, '2024-05-12', 2.97],
-    [7, 6, '2024-03-18', 5.94],
-    [8, 7, '2024-06-01', 1.98],
-    [9, 8, '2024-04-10', 3.96],
-    [10, 9, '2024-02-28', 7.92],
-    [11, 10, '2024-05-20', 9.90],
-    [12, 10, '2024-07-15', 3.96],
-    [13, 3, '2024-08-01', 5.94],
-    [14, 5, '2024-09-10', 7.92],
-    [15, 1, '2024-10-05', 11.88],
-  ];
-  final stmt = db.prepare('INSERT INTO invoices VALUES (?, ?, ?, ?)');
-  for (final i in invoices) {
-    stmt.execute(i);
-  }
-  stmt.close();
+const _customers = [
+  [1, 'Amara', 'Okafor', 'amara.okafor@example.com', 'Lagos', 'Nigeria'],
+  [2, 'Daniel', 'Weber', 'daniel.weber@example.com', 'Berlin', 'Germany'],
+  [3, 'Sofia', 'Rossi', 'sofia.rossi@example.com', 'Rome', 'Italy'],
+  [4, 'James', 'Carter', 'james.carter@example.com', 'Chicago', 'USA'],
+  [5, 'Priya', 'Nair', 'priya.nair@example.com', 'Mumbai', 'India'],
+  [6, 'Lucas', 'Silva', 'lucas.silva@example.com', 'São Paulo', 'Brazil'],
+  [7, 'Emma', 'Johansson', 'emma.johansson@example.com', 'Stockholm', 'Sweden'],
+  [8, 'Kenji', 'Tanaka', 'kenji.tanaka@example.com', 'Osaka', 'Japan'],
+  [9, 'Fatima', 'Hassan', 'fatima.hassan@example.com', 'Cairo', 'Egypt'],
+  [10, 'Olivia', 'Brown', 'olivia.brown@example.com', 'Toronto', 'Canada'],
+];
 
-  const invoiceLines = [
-    [1, 1, 1, 0.99, 1],
-    [2, 1, 5, 0.99, 1],
-    [3, 1, 14, 0.99, 1],
-    [4, 1, 22, 0.99, 1],
-    [5, 1, 33, 1.29, 1],
-    [6, 1, 39, 1.29, 1],
-    [7, 2, 19, 0.99, 1],
-    [8, 2, 20, 0.99, 1],
-    [9, 2, 21, 0.99, 1],
-    [10, 2, 41, 0.99, 1],
-    [11, 3, 8, 0.99, 1],
-    [12, 3, 9, 0.99, 1],
-    [13, 3, 25, 0.99, 1],
-    [14, 3, 26, 0.99, 1],
-    [15, 3, 27, 0.99, 1],
-    [16, 3, 36, 0.99, 1],
-    [17, 3, 37, 0.99, 1],
-    [18, 3, 47, 0.99, 1],
-    [19, 3, 48, 0.99, 1],
-    [20, 4, 30, 0.99, 1],
-    [21, 4, 31, 0.99, 1],
-    [22, 5, 5, 0.99, 1],
-    [23, 5, 6, 0.99, 1],
-    [24, 5, 7, 0.99, 1],
-    [25, 5, 14, 0.99, 1],
-    [26, 5, 16, 0.99, 1],
-    [27, 5, 17, 0.99, 1],
-    [28, 5, 18, 0.99, 1],
-    [29, 5, 22, 0.99, 1],
-    [30, 5, 23, 0.99, 1],
-    [31, 5, 24, 0.99, 1],
-    [32, 5, 43, 0.99, 1],
-    [33, 5, 44, 0.99, 1],
-    [34, 5, 45, 0.99, 1],
-    [35, 5, 46, 0.99, 1],
-    [36, 6, 33, 1.29, 1],
-    [37, 6, 34, 1.29, 1],
-    [38, 6, 41, 0.39, 1],
-    [39, 7, 2, 0.99, 1],
-    [40, 7, 3, 0.99, 1],
-    [41, 7, 11, 0.99, 1],
-    [42, 7, 12, 0.99, 1],
-    [43, 7, 13, 0.99, 1],
-    [44, 7, 49, 0.99, 1],
-    [45, 8, 39, 0.99, 1],
-    [46, 8, 40, 0.99, 1],
-    [47, 9, 30, 0.99, 1],
-    [48, 9, 31, 0.99, 1],
-    [49, 9, 32, 0.99, 1],
-    [50, 9, 42, 0.99, 1],
-    [51, 10, 1, 0.99, 1],
-    [52, 10, 2, 0.99, 1],
-    [53, 10, 3, 0.99, 1],
-    [54, 10, 4, 0.99, 1],
-    [55, 10, 14, 0.99, 1],
-    [56, 10, 22, 0.99, 1],
-    [57, 10, 36, 0.99, 1],
-    [58, 10, 37, 0.99, 1],
-    [59, 11, 5, 0.99, 1],
-    [60, 11, 8, 0.99, 1],
-    [61, 11, 14, 0.99, 1],
-    [62, 11, 22, 0.99, 1],
-    [63, 11, 25, 0.99, 1],
-    [64, 11, 33, 1.29, 1],
-    [65, 11, 34, 1.29, 1],
-    [66, 11, 39, 1.29, 1],
-    [67, 11, 41, 1.29, 1],
-    [68, 11, 51, 0.99, 1],
-    [69, 12, 19, 0.99, 1],
-    [70, 12, 20, 0.99, 1],
-    [71, 12, 21, 0.99, 1],
-    [72, 12, 43, 0.99, 1],
-    [73, 13, 11, 0.99, 1],
-    [74, 13, 12, 0.99, 1],
-    [75, 13, 13, 0.99, 1],
-    [76, 13, 25, 0.99, 1],
-    [77, 13, 28, 0.99, 1],
-    [78, 13, 29, 0.99, 1],
-    [79, 14, 16, 0.99, 1],
-    [80, 14, 17, 0.99, 1],
-    [81, 14, 18, 0.99, 1],
-    [82, 14, 33, 1.29, 1],
-    [83, 14, 34, 1.29, 1],
-    [84, 14, 35, 1.29, 1],
-    [85, 14, 47, 0.99, 1],
-    [86, 14, 48, 0.99, 1],
-    [87, 15, 1, 0.99, 1],
-    [88, 15, 2, 0.99, 1],
-    [89, 15, 3, 0.99, 1],
-    [90, 15, 4, 0.99, 1],
-    [91, 15, 5, 0.99, 1],
-    [92, 15, 8, 0.99, 1],
-    [93, 15, 14, 0.99, 1],
-    [94, 15, 22, 0.99, 1],
-    [95, 15, 25, 0.99, 1],
-    [96, 15, 30, 0.99, 1],
-    [97, 15, 39, 1.29, 1],
-    [98, 15, 41, 1.29, 1],
-  ];
-  final stmt2 = db.prepare('INSERT INTO invoice_lines VALUES (?, ?, ?, ?, ?)');
-  for (final il in invoiceLines) {
-    stmt2.execute(il);
-  }
-  stmt2.close();
-}
+// Each Total is the sum of its order_items (UnitPrice * Quantity).
+const _orders = [
+  [1, 3, '2024-01-12', 105.91],
+  [2, 3, '2024-03-05', 120.91],
+  [3, 3, '2024-06-18', 109.92],
+  [4, 1, '2024-01-20', 64.94],
+  [5, 1, '2024-05-02', 50.94],
+  [6, 2, '2024-02-14', 49.94],
+  [7, 2, '2024-07-09', 45.95],
+  [8, 4, '2024-02-28', 64.94],
+  [9, 5, '2024-03-17', 41.95],
+  [10, 6, '2024-04-03', 65.93],
+  [11, 7, '2024-04-22', 64.93],
+  [12, 8, '2024-05-30', 57.93],
+  [13, 9, '2024-08-11', 92.94],
+  [14, 10, '2024-09-01', 59.93],
+  [15, 4, '2024-10-15', 88.95],
+];
 
-void _seedPlaylists(Database db) {
-  const playlists = [
-    [1, 'Road Trip Rock'],
-    [2, 'Chill Jazz'],
-    [3, 'Party Anthems'],
-  ];
-  final stmt = db.prepare('INSERT INTO playlists VALUES (?, ?)');
-  for (final p in playlists) {
-    stmt.execute(p);
-  }
-  stmt.close();
+// OrderItemId, OrderId, BookId, UnitPrice, Quantity
+const _orderItems = [
+  [1, 1, 1, 9.99, 1],
+  [2, 1, 5, 10.99, 1],
+  [3, 1, 34, 13.99, 1],
+  [4, 1, 7, 10.99, 1],
+  [5, 1, 20, 9.99, 1],
+  [6, 1, 26, 7.99, 1],
+  [7, 1, 46, 8.99, 1],
+  [8, 1, 13, 14.99, 1],
+  [9, 1, 48, 17.99, 1],
+  [10, 2, 1, 9.99, 1],
+  [11, 2, 37, 18.99, 1],
+  [12, 2, 38, 19.99, 1],
+  [13, 2, 8, 12.99, 1],
+  [14, 2, 49, 18.99, 1],
+  [15, 2, 14, 11.99, 1],
+  [16, 2, 22, 6.99, 1],
+  [17, 2, 29, 8.99, 1],
+  [18, 2, 11, 11.99, 1],
+  [19, 3, 35, 16.99, 1],
+  [20, 3, 12, 12.99, 1],
+  [21, 3, 51, 15.99, 1],
+  [22, 3, 52, 16.99, 1],
+  [23, 3, 50, 16.99, 1],
+  [24, 3, 40, 11.99, 1],
+  [25, 3, 25, 8.99, 1],
+  [26, 3, 3, 8.99, 1],
+  [27, 4, 12, 12.99, 1],
+  [28, 4, 13, 14.99, 1],
+  [29, 4, 26, 7.99, 1],
+  [30, 4, 2, 9.99, 1],
+  [31, 4, 17, 8.99, 1],
+  [32, 4, 44, 9.99, 1],
+  [33, 5, 29, 8.99, 1],
+  [34, 5, 31, 7.99, 1],
+  [35, 5, 46, 8.99, 1],
+  [36, 5, 47, 7.99, 1],
+  [37, 5, 26, 7.99, 1],
+  [38, 5, 30, 8.99, 1],
+  [39, 6, 20, 9.99, 1],
+  [40, 6, 22, 6.99, 1],
+  [41, 6, 23, 7.99, 1],
+  [42, 6, 42, 8.99, 1],
+  [43, 6, 43, 7.99, 1],
+  [44, 6, 26, 7.99, 1],
+  [45, 7, 17, 8.99, 1],
+  [46, 7, 18, 7.99, 1],
+  [47, 7, 19, 7.99, 1],
+  [48, 7, 41, 8.99, 1],
+  [49, 7, 15, 11.99, 1],
+  [50, 8, 14, 11.99, 1],
+  [51, 8, 15, 11.99, 1],
+  [52, 8, 16, 10.99, 1],
+  [53, 8, 40, 11.99, 1],
+  [54, 8, 6, 9.99, 1],
+  [55, 8, 26, 7.99, 1],
+  [56, 9, 26, 7.99, 2],
+  [57, 9, 9, 7.99, 1],
+  [58, 9, 10, 8.99, 1],
+  [59, 9, 45, 8.99, 1],
+  [60, 10, 9, 7.99, 1],
+  [61, 10, 10, 8.99, 1],
+  [62, 10, 25, 8.99, 1],
+  [63, 10, 28, 11.99, 1],
+  [64, 10, 44, 9.99, 1],
+  [65, 10, 21, 8.99, 1],
+  [66, 10, 27, 8.99, 1],
+  [67, 11, 11, 11.99, 1],
+  [68, 11, 33, 9.99, 1],
+  [69, 11, 29, 8.99, 1],
+  [70, 11, 30, 8.99, 1],
+  [71, 11, 4, 7.99, 1],
+  [72, 11, 3, 8.99, 1],
+  [73, 11, 26, 7.99, 1],
+  [74, 12, 25, 8.99, 1],
+  [75, 12, 21, 8.99, 1],
+  [76, 12, 22, 6.99, 1],
+  [77, 12, 24, 7.99, 1],
+  [78, 12, 42, 8.99, 1],
+  [79, 12, 43, 7.99, 1],
+  [80, 12, 23, 7.99, 1],
+  [81, 13, 39, 15.99, 1],
+  [82, 13, 34, 13.99, 1],
+  [83, 13, 50, 16.99, 1],
+  [84, 13, 52, 16.99, 1],
+  [85, 13, 12, 12.99, 1],
+  [86, 13, 36, 15.99, 1],
+  [87, 14, 32, 7.99, 1],
+  [88, 14, 30, 8.99, 1],
+  [89, 14, 31, 7.99, 1],
+  [90, 14, 47, 7.99, 1],
+  [91, 14, 29, 8.99, 1],
+  [92, 14, 33, 9.99, 1],
+  [93, 14, 26, 7.99, 1],
+  [94, 15, 36, 15.99, 1],
+  [95, 15, 48, 17.99, 1],
+  [96, 15, 49, 18.99, 1],
+  [97, 15, 35, 16.99, 1],
+  [98, 15, 37, 18.99, 1],
+];
 
-  const playlistTracks = [
-    [1, 1],
-    [1, 2],
-    [1, 5],
-    [1, 6],
-    [1, 7],
-    [1, 14],
-    [1, 22],
-    [1, 43],
-    [2, 25],
-    [2, 26],
-    [2, 27],
-    [2, 28],
-    [2, 29],
-    [3, 14],
-    [3, 22],
-    [3, 33],
-    [3, 39],
-    [3, 51],
-    [3, 52],
-  ];
-  final stmt2 = db.prepare('INSERT INTO playlist_tracks VALUES (?, ?)');
-  for (final pt in playlistTracks) {
-    stmt2.execute(pt);
-  }
-  stmt2.close();
-}
+const _readingLists = [
+  [1, 'Summer Reading'],
+  [2, 'Classic Mysteries'],
+  [3, 'Book Club Picks'],
+];
+
+const _readingListBooks = [
+  [1, 9],
+  [1, 22],
+  [1, 25],
+  [1, 26],
+  [1, 29],
+  [2, 14],
+  [2, 15],
+  [2, 16],
+  [2, 17],
+  [2, 18],
+  [2, 19],
+  [2, 40],
+  [2, 41],
+  [3, 1],
+  [3, 11],
+  [3, 12],
+  [3, 13],
+  [3, 34],
+  [3, 36],
+  [3, 48],
+];

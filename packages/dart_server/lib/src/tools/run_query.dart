@@ -35,7 +35,7 @@ class RunQueryTool {
   /// Executes the query and returns JSON rows, or an error message.
   ///
   /// ```
-  /// [{"Name":"AC/DC"},{"Name":"Led Zeppelin"},{"Name":"Queen"}]
+  /// [{"Name":"Jane Austen"},{"Name":"Charles Dickens"},{"Name":"Mark Twain"}]
   /// ```
   Future<String> query(SqlQueryInput input) async {
     final sql = input.sql.trim();

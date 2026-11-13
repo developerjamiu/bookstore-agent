@@ -27,14 +27,14 @@ void main() {
         SqlQueryInput(sql: 'SELECT Name FROM genres ORDER BY Name LIMIT 3'),
       );
 
-      expect(result, contains('Blues'));
-      expect(result, contains('Electronic'));
-      expect(result, contains('Jazz'));
+      expect(result, contains('Adventure'));
+      expect(result, contains('Biography'));
+      expect(result, contains("Children's"));
     });
 
     test('returns correct count from an aggregate query', () async {
       final result = await tool.query(
-        SqlQueryInput(sql: 'SELECT COUNT(*) as total FROM artists'),
+        SqlQueryInput(sql: 'SELECT COUNT(*) as total FROM authors'),
       );
 
       expect(result, contains('"total":15'));
@@ -44,20 +44,20 @@ void main() {
       final result = await tool.query(
         SqlQueryInput(
           sql:
-              'SELECT a.Title, ar.Name '
-              'FROM albums a '
-              'JOIN artists ar ON a.ArtistId = ar.ArtistId '
-              'WHERE ar.Name = \'Queen\'',
+              'SELECT b.Title, a.Name '
+              'FROM books b '
+              'JOIN authors a ON b.AuthorId = a.AuthorId '
+              'WHERE a.Name = \'Jules Verne\'',
         ),
       );
 
-      expect(result, contains('A Night at the Opera'));
-      expect(result, contains('News of the World'));
+      expect(result, contains('Around the World in Eighty Days'));
+      expect(result, contains('The Mysterious Island'));
     });
 
     test('returns a message when query has no results', () async {
       final result = await tool.query(
-        SqlQueryInput(sql: "SELECT * FROM artists WHERE Name = 'Nobody'"),
+        SqlQueryInput(sql: "SELECT * FROM authors WHERE Name = 'Nobody'"),
       );
 
       expect(result, 'Query returned 0 rows.');
@@ -65,7 +65,7 @@ void main() {
 
     test('rejects DELETE statements', () async {
       final result = await tool.query(
-        SqlQueryInput(sql: 'DELETE FROM artists WHERE ArtistId = 1'),
+        SqlQueryInput(sql: 'DELETE FROM authors WHERE AuthorId = 1'),
       );
 
       expect(result, contains('Only SELECT queries are allowed'));
@@ -74,14 +74,16 @@ void main() {
 
     test('rejects INSERT statements', () async {
       final result = await tool.query(
-        SqlQueryInput(sql: "INSERT INTO artists VALUES (99, 'Hacker')"),
+        SqlQueryInput(
+          sql: "INSERT INTO authors VALUES (99, 'Hacker', 'Nowhere')",
+        ),
       );
 
       expect(result, contains('Only SELECT queries are allowed'));
     });
 
     test('rejects DROP statements', () async {
-      final result = await tool.query(SqlQueryInput(sql: 'DROP TABLE artists'));
+      final result = await tool.query(SqlQueryInput(sql: 'DROP TABLE authors'));
 
       expect(result, contains('Only SELECT queries are allowed'));
     });

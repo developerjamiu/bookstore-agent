@@ -1,6 +1,6 @@
 # Build Your First AI Agent with Genkit — Node.js Track
 
-This guide documents the **complete** Node implementation (same files as on [`developerjamiu/music-store-agent`](https://github.com/developerjamiu/music-store-agent) branch **`main`**). On **this `starter` fork**, you build those files from scratch on top of the placeholder shell in `packages/nodeJS-server/`, or read along with the reference repo.
+This guide documents the **complete** Node implementation (same files as on [`developerjamiu/music-store-agent`](https://github.com/developerjamiu/music-store-agent) branch **`main`**). On **this `starter` fork**, you build those files from scratch on top of the placeholder shell in `packages/nodejs_server/`, or read along with the reference repo.
 
 **Prerequisites:** Node.js 20+, `GEMINI_API_KEY` or `GOOGLE_API_KEY` in the environment (never commit keys).
 
@@ -11,7 +11,7 @@ This guide documents the **complete** Node implementation (same files as on [`de
 ## Step 0: Install and run the reference server
 
 ```sh
-cd packages/nodeJS-server
+cd packages/nodejs_server
 npm install
 export GEMINI_API_KEY=your-key-here
 npm start
@@ -23,7 +23,7 @@ The server reads SQLite from `packages/server/data/music_store.db`.
 
 ## Step 1–8: Implementation files (reference)
 
-The following files form the Node agent. On **`main`** they are already present under `packages/nodeJS-server/src/`.
+The following files form the Node agent. On **`main`** they are already present under `packages/nodejs_server/src/`.
 
 ### Schemas — `src/schemas/researchResult.ts`
 

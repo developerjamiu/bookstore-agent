@@ -7,4 +7,4 @@ pubspec.lock
 genkit-agent-codelab-plan.md
 
 node_modules/
-packages/nodeJS-server/dist/
+packages/nodejs_server/dist/

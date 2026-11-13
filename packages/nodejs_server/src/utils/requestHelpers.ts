@@ -10,7 +10,7 @@ export function errorResponse(res: ServerResponse, statusCode: number, message: 
   jsonResponse(res, { error: message }, statusCode);
 }
 
-/** Used once you wire Genkit in the research route (see CODELAB-NodeJS on main). */
+/** Used once you wire Genkit in the research route (see CODELAB-NODEJS.md). */
 export function handleGenkitError(res: ServerResponse, e: GenkitError): void {
   console.error('Genkit error:', e);
   const message = (e.message ?? '').toLowerCase();

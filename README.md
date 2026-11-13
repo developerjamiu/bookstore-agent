@@ -1,6 +1,6 @@
 # Music Store Agent — Build Your First AI Agent with Genkit
 
-> **This `starter` branch** (typical **fork** clone) is the **codelab starting point**: Flutter + Dart server skeleton + **Node.js skeleton** under `packages/nodeJS-server/` with placeholder APIs.  
+> **This `starter` branch** (typical **fork** clone) is the **codelab starting point**: Flutter + Dart server skeleton + **Node.js skeleton** under `packages/nodejs_server/` with placeholder APIs.  
 > **Full solution** (completed Dart + Node agents, server tests): [`developerjamiu/music-store-agent`](https://github.com/developerjamiu/music-store-agent) branch **`main`**.
 
 A hands-on codelab project where you build a **real AI agent** — an LLM that
@@ -44,11 +44,11 @@ Every tool call is a **decision the model made** — visible in the UI's
 | ------------ | ----------------------------------------------------------- |
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) **or** [Genkit JS](https://genkit.dev/docs/js/get-started/) (Node track) |
 | LLM          | Google Gemini — set `GOOGLE_API_KEY` or `GEMINI_API_KEY`    |
-| Server       | **Dart:** Shelf (`packages/server`) **·** **Node:** `packages/nodeJS-server` |
+| Server       | **Dart:** Shelf (`packages/server`) **·** **Node:** `packages/nodejs_server` |
 | Database     | SQLite file `packages/server/data/music_store.db` (Dart track & Node final wiring) |
 | Client       | Flutter (Material 3) — `POST /api/research` on port **8080** |
 
-**Codelabs:** [CODELAB.md](./CODELAB.md) (Dart) · [CODELAB-NodeJS.md](./CODELAB-NodeJS.md) (Node — reference code lives on upstream **`main`**).
+**Codelabs:** [CODELAB.md](./CODELAB.md) (Dart) · [CODELAB-NODEJS.md](./CODELAB-NODEJS.md) (Node — reference code lives on upstream **`main`**).
 
 ## Repository Structure
 
@@ -57,10 +57,10 @@ research_assistant/
 ├── pubspec.yaml                         # Dart workspace root
 ├── README.md
 ├── CODELAB.md
-├── CODELAB-NodeJS.md
+├── CODELAB-NODEJS.md
 │
 ├── packages/
-│   ├── nodeJS-server/
+│   ├── nodejs_server/
 │   │   ├── package.json
 │   │   ├── package-lock.json
 │   │   ├── tsconfig.json
@@ -119,7 +119,7 @@ research_assistant/
 
 - **Dart SDK** >= 3.11 (`dart --version`)
 - **Flutter SDK** >= 3.27 (`flutter --version`)
-- **Node.js** >= 20 — for `packages/nodeJS-server` only
+- **Node.js** >= 20 — for `packages/nodejs_server` only
 - **Google AI API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (`GOOGLE_API_KEY` / `GEMINI_API_KEY`; never commit keys)
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer)
 
@@ -170,7 +170,7 @@ dart run packages/server/bin/server.dart
 **Node — placeholder response (no API key required for the shell):**
 
 ```sh
-cd packages/nodeJS-server && npm install && npm start
+cd packages/nodejs_server && npm install && npm start
 ```
 
 **Full agent + tests** — clone upstream **`main`**: [music-store-agent](https://github.com/developerjamiu/music-store-agent).
@@ -263,7 +263,7 @@ agent works around this with two separate calls:
   loading states, error handling, and "New question" reset
 - **Dart server scaffolding** — `packages/server`: `bin/server.dart`, CORS,
   `request_helpers.dart`, placeholder `POST /api/research`
-- **Node server scaffolding** — `packages/nodeJS-server`: HTTP server, CORS,
+- **Node server scaffolding** — `packages/nodejs_server`: HTTP server, CORS,
   placeholder `POST /api/research` (see **Repository Structure**). No SQLite or Genkit flows yet.
 - **SQLite database** — `packages/server/data/music_store.db` pre-seeded with all 9 tables
 - **Pubspec files** — all dependencies already configured

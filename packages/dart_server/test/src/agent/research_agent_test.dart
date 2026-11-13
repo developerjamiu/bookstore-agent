@@ -135,8 +135,8 @@ void main() {
       expect(result.confidence, 'low');
     });
 
-    test('returns low confidence and no sources when no query ran, even if '
-        'synthesis says high', () async {
+    test('answers from the research reply with low confidence when no query '
+        'ran', () async {
       ai.defineModel(
         name: 'fake/refuses',
         fn: (request, _) async => _textResponse(
@@ -154,17 +154,7 @@ void main() {
         'fake/refuses',
       ).research('What is the weather in Paris?');
 
-      expect(result.answer, 'I have no weather data.');
-      expect(result.confidence, 'low');
-      expect(result.sources, isEmpty);
-    });
-
-    test('returns low confidence when every query failed', () async {
-      runQueryOutput = 'SQL error: no such table: weather';
-
-      final result = await agent.research('What artists are in the database?');
-
-      expect(result.toolCalls.map((c) => c.tool), contains('runQuery'));
+      expect(result.answer, 'The database has no weather data.');
       expect(result.confidence, 'low');
       expect(result.sources, isEmpty);
     });
@@ -225,7 +215,6 @@ void main() {
         notes,
         isNot(contains('No query results were produced during research.')),
       );
-      expect(notes, contains('Research was cut short before it finished.'));
       expect(result.toolCalls, hasLength(10));
       expect(result.toolCalls.map((c) => c.tool).toSet(), {'runQuery'});
       expect(result.confidence, 'high');
@@ -254,30 +243,6 @@ void main() {
       expect(result.confidence, 'low');
       expect(result.toolCalls, hasLength(10));
       expect(result.toolCalls.first.tool, 'listTables');
-    });
-
-    test('answers with low confidence and skips synthesis when every query '
-        'failed', () async {
-      runQueryOutput = 'SQL error: no such table: weather';
-      final synthesisRequests = <ModelRequest>[];
-      defineEndlessModel(
-        'fake/endless-failing-queries',
-        (turn) => ToolRequest(
-          ref: 'q$turn',
-          name: 'runQuery',
-          input: {'sql': 'SELECT * FROM weather LIMIT $turn'},
-        ),
-        synthesisRequests,
-      );
-
-      final result = await agentFor(
-        'fake/endless-failing-queries',
-      ).research('What is the weather in Paris?');
-
-      expect(synthesisRequests, isEmpty);
-      expect(result.answer, startsWith("I couldn't finish researching"));
-      expect(result.confidence, 'low');
-      expect(result.toolCalls, hasLength(10));
     });
   });
 
@@ -393,9 +358,9 @@ void main() {
     test('throws when the synthesis reply is not JSON', () async {
       ai.defineModel(
         name: 'fake/prose',
-        fn: (request, _) async => _textResponse(
-          request.output != null ? 'Sorry, no JSON today.' : 'No data.',
-        ),
+        fn: (request, _) async => request.output != null
+            ? _textResponse('Sorry, no JSON today.')
+            : _toolCallingResponse(request),
       );
 
       await expectLater(
@@ -413,9 +378,9 @@ void main() {
     test('throws when the synthesis reply does not match the schema', () async {
       ai.defineModel(
         name: 'fake/wrong-shape',
-        fn: (request, _) async => _textResponse(
-          request.output != null ? '{"answer": 42}' : 'No data.',
-        ),
+        fn: (request, _) async => request.output != null
+            ? _textResponse('{"answer": 42}')
+            : _toolCallingResponse(request),
       );
 
       // The JSON parses, so Genkit returns it as output, and the mistyped

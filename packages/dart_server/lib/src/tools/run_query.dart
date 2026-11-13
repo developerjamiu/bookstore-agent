@@ -14,17 +14,6 @@ import '../schemas/sql_query_input.dart';
 class RunQueryTool {
   static const _maxRows = 50;
 
-  /// The output for a query that ran and matched no rows.
-  static const noRowsMessage = 'Query returned 0 rows.';
-
-  /// Whether [output] from this tool is a query result: JSON rows, which
-  /// may end with a truncation note, or [noRowsMessage].
-  ///
-  /// SQL errors and rejected statements are output too, but not results.
-  /// A query that matched no rows counts, since "none" can be a true answer.
-  static bool isResult(Object? output) =>
-      output is String && (output.startsWith('[') || output == noRowsMessage);
-
   final Genkit _ai;
   final Database _db;
 
@@ -58,7 +47,7 @@ class RunQueryTool {
     try {
       final result = _db.select(sql);
 
-      if (result.isEmpty) return noRowsMessage;
+      if (result.isEmpty) return 'Query returned 0 rows.';
 
       final columns = result.first.keys.toList();
       final rows = result.take(_maxRows).map((row) {

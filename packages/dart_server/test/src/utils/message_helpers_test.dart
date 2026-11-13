@@ -90,58 +90,6 @@ void main() {
     });
   });
 
-  group('hasQueryResults', () {
-    Message toolResponse(String name, [String output = '[{"n":1}]']) => Message(
-      role: Role.tool,
-      content: [
-        ToolResponsePart(
-          toolResponse: ToolResponse(name: name, output: output),
-        ),
-      ],
-    );
-
-    test('is true when a runQuery call returned rows', () {
-      expect(
-        hasQueryResults([toolResponse('listTables'), toolResponse('runQuery')]),
-        isTrue,
-      );
-    });
-
-    test('is true when a runQuery call matched no rows', () {
-      expect(
-        hasQueryResults([toolResponse('runQuery', 'Query returned 0 rows.')]),
-        isTrue,
-      );
-    });
-
-    test('is false when every runQuery call failed', () {
-      expect(
-        hasQueryResults([
-          toolResponse('runQuery', 'SQL error: no such table: weather'),
-          toolResponse(
-            'runQuery',
-            'Only SELECT queries are allowed. Received: DROP',
-          ),
-        ]),
-        isFalse,
-      );
-    });
-
-    test('is false when only schema tools returned output', () {
-      expect(
-        hasQueryResults([
-          toolResponse('listTables', '[]'),
-          toolResponse('describeTable', '[]'),
-        ]),
-        isFalse,
-      );
-    });
-
-    test('is false for an empty history', () {
-      expect(hasQueryResults(const []), isFalse);
-    });
-  });
-
   group('buildResearchNotes', () {
     test('includes runQuery results with their SQL', () {
       final response = _buildResponse(

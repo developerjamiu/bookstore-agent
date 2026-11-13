@@ -31,10 +31,6 @@ class ResearchAgent {
       "I couldn't finish researching this question within the allowed "
       'steps. Try asking something more specific.';
 
-  static const _cutShortNote =
-      'Research was cut short before it finished. Say which parts of the '
-      'question these notes do not answer.';
-
   static const _synthesisPrompt =
       'You are a database analyst. Using ONLY the research notes below, '
       'produce a structured answer to the user\'s question.\n\n'
@@ -71,37 +67,27 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    final researchResponse = await _runResearchPhase(question);
-    final toolCalls = extractToolCalls(researchResponse.messages);
+    final research = await _runResearchPhase(question);
+    final toolCalls = extractToolCalls(research.messages);
 
-    // The tool loop ran out of turns. The result still holds the history,
-    // so the notes come from the queries the agent really ran. With no query
-    // results at all, there is nothing true to synthesize from.
-    final outOfTurns = researchResponse.finishReason == FinishReason.aborted;
-    final hasResults = hasQueryResults(researchResponse.messages);
-    if (outOfTurns && !hasResults) {
+    // No query ran, so nothing came from the database: answer with low
+    // confidence. That covers out-of-scope questions and an agent that ran
+    // out of turns before querying.
+    if (!toolCalls.any((call) => call.tool == 'runQuery')) {
       return ResearchResult(
-        answer: _outOfTurnsAnswer,
+        answer: research.text.isNotEmpty ? research.text : _outOfTurnsAnswer,
         sources: const [],
         confidence: 'low',
         toolCalls: toolCalls,
       );
     }
 
-    final notes = buildResearchNotes(researchResponse);
-    final synthesis = await _runSynthesisPhase(
-      question,
-      outOfTurns ? '$notes\n$_cutShortNote' : notes,
-    );
-
-    // With no query results, nothing in the answer came from the database,
-    // so it cannot be confident and has no query to cite. A refusal such as
-    // "I have no weather data" ends here, and the synthesis model tends to
-    // rate a clear refusal as high confidence.
+    final notes = buildResearchNotes(research);
+    final synthesis = await _runSynthesisPhase(question, notes);
     return ResearchResult(
       answer: synthesis.answer,
-      sources: hasResults ? synthesis.sources : const [],
-      confidence: hasResults ? synthesis.confidence : 'low',
+      sources: synthesis.sources,
+      confidence: synthesis.confidence,
       toolCalls: toolCalls,
     );
   }

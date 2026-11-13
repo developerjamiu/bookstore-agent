@@ -269,6 +269,27 @@ void main() {
         ),
       );
 
+      /// A research turn that runs one query, then finishes once it has a result.
+      ModelResponse queryThenDone(ModelRequest request) {
+        if (request.messages.any((m) => m.role == Role.tool)) {
+          return text('Done.');
+        }
+        return ModelResponse(
+          finishReason: FinishReason.stop,
+          message: Message(
+            role: Role.model,
+            content: [
+              ToolRequestPart(
+                toolRequest: ToolRequest(
+                  name: 'runQuery',
+                  input: const {'sql': 'SELECT 1'},
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
       test('answers 500 when the model fails', () async {
         final response = await send(
           Method.post,
@@ -376,9 +397,9 @@ void main() {
           Method.post,
           body: _json({'question': 'How many artists are there?'}),
           flow: agentFlow(
-            (request) async => text(
-              request.output != null ? 'Sorry, no JSON today.' : 'Done.',
-            ),
+            (request) async => request.output != null
+                ? text('Sorry, no JSON today.')
+                : queryThenDone(request),
           ),
         );
 
@@ -398,8 +419,9 @@ void main() {
             Method.post,
             body: _json({'question': 'How many artists are there?'}),
             flow: agentFlow(
-              (request) async =>
-                  text(request.output != null ? '{"answer": 42}' : 'Done.'),
+              (request) async => request.output != null
+                  ? text('{"answer": 42}')
+                  : queryThenDone(request),
             ),
           );
 

@@ -11,7 +11,7 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 - Defining typed schemas with Schemantic for tool inputs and structured output
 - Creating Genkit tools with `ai.defineTool()`
 - Building an agentic flow with a tool-calling loop and `maxTurns`
-- Getting a structured JSON answer from the same model call that uses the tools
+- Getting a structured JSON answer from a model that uses tools
 - Making the agent admit when it can't answer, instead of inventing one
 - Wiring everything together with constructor dependency injection
 
@@ -114,7 +114,7 @@ What happens when the app sends a question (errors left out):
 ```mermaid
 flowchart TD
     Q["Flutter app sends a question"] --> R["routes/research.dart<br/>POST /api/research"]
-    R --> G["research_agent.dart<br/>one generate call, up to 10 turns"]
+    R --> G["research_agent.dart<br/>generate with your tools, up to 10 turns"]
     G <-->|"asks for a tool, gets the result"| T["Your tools, run by Genkit<br/>listTables, describeTable, runQuery"]
     G -->|"replies with a ResearchOutput"| D{"Did it call runQuery?"}
     D -- No --> L["Answer with low confidence"]
@@ -525,7 +525,7 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
 
 ## Step 4: Build the Research Agent
 
-Now put the pieces together. In one call, the agent gives Gemini your tools and asks for the answer in the `ResearchOutput` shape from Step 1.
+The agent gives Gemini your three tools and asks for the reply in the `ResearchOutput` shape from Step 1.
 
 Create `packages/dart_server/lib/src/agent/research_agent.dart`:
 
@@ -542,29 +542,24 @@ import '../utils/message_helpers.dart';
 
 class ResearchAgent {
   static const _prompt =
-      'You are a database analyst agent. You can ONLY answer questions '
-      'by querying the music store database. Never use your own knowledge. '
-      'You do NOT know the database schema, so you must discover it using '
-      'the tools provided:\n'
-      '- listTables: discover what tables exist\n'
-      '- describeTable: see the columns and foreign keys of a table\n'
-      '- runQuery: execute a read-only SQL SELECT query\n\n'
-      'Strategy:\n'
-      '1. Use listTables to discover what tables exist.\n'
-      '2. Call describeTable on relevant tables to understand columns and joins.\n'
-      '3. Write and run SQL queries to find the answer.\n'
+      'You are a database analyst. Answer questions ONLY from the results of '
+      'queries you run on the music store database, never from your own '
+      'knowledge.\n\n'
+      'You do not know the database schema. To answer:\n'
+      '1. Use listTables to see what tables exist.\n'
+      '2. Use describeTable on the relevant tables to learn their columns and joins.\n'
+      '3. Write and run SQL queries with runQuery.\n'
       '4. If a query returns unexpected results, try a different approach.\n'
-      '5. If the question cannot be answered with the available data, say so.\n'
+      '5. If the data cannot answer the question, say so.\n'
       '6. As soon as your query results answer the question, stop calling '
       'tools and reply.\n\n'
-      'When you are done, reply with:\n'
-      '- answer: a clear answer that interprets the query results. When '
-      'listing items such as tracks, name each distinct item once and give '
-      'a count when it appears more than once.\n'
+      'In your reply:\n'
+      '- answer: interpret the query results clearly. When listing items such '
+      'as tracks, name each distinct item once and give a count when it '
+      'appears more than once.\n'
       '- sources: the SELECT statements that produced the key results.\n'
-      '- confidence: "high" if the query results clearly answer the '
-      'question, "medium" if partially, "low" if the data was not found.\n\n'
-      'NEVER answer from your own knowledge. All answers must come from query results.';
+      '- confidence: "high" if the results clearly answer the question, '
+      '"medium" if partially, "low" if the database cannot answer it.';
 
   static const _maxTurns = 10;
 
@@ -596,8 +591,8 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    // One call: the model uses the tools as often as it needs, up to
-    // _maxTurns times, then replies in the ResearchOutput shape.
+    // The model uses the tools as often as it needs, up to _maxTurns
+    // times, then replies in the ResearchOutput shape.
     final response = await _ai.generate(
       model: _model,
       system: _prompt,
@@ -644,15 +639,12 @@ class ResearchAgent {
 
 How it works:
 
-- **The prompt:** `_prompt` tells the model it doesn't know the database, must answer only from query results, and should stop calling tools once it can answer.
-- **One call:** `generate` gets your three tools and `outputSchema`. Gemini calls tools as often as it needs, up to 10 times, then replies as a `ResearchOutput`.
-- **Turn limit:** if Gemini runs out of turns before answering, the agent says it couldn't finish instead of guessing.
-- **No query, low confidence:** if the model never called `runQuery`, nothing came from the database, so the answer gets `low` confidence and no sources. That is how a question the database can't answer, like "What is the weather today?", gets a polite refusal.
+- **Tool loop:** Gemini calls tools as often as it needs, up to `_maxTurns` (10) times, then replies as a `ResearchOutput`. Line 6 of the prompt tells it to stop once it can answer.
+- **Turn limit:** if Gemini runs out of turns first, the agent says it couldn't finish instead of guessing.
+- **No query, low confidence:** if the model never called `runQuery`, nothing came from the database, so the answer gets `low` confidence and no sources.
 - **Errors:** Genkit doesn't throw when the model call fails. It returns a result with no `output`. The agent throws instead, so the route in Step 6 can answer with an HTTP error.
 
 `call()` wraps `research` in a Genkit flow, the function the route will run.
-
-> **Note:** On Gemini, using tools and replying as JSON in the same call is a preview feature for Gemini 3 and later models.
 
 **Verify:** `dart analyze` prints `No issues found!`
 
@@ -828,7 +820,7 @@ You now have a working agent that answers from real query results.
 | **5 schemas**        | Define typed data shapes for tool inputs and agent output       |
 | **3 tools**          | Explore a database: list tables, describe schema, run queries   |
 | **Message helper**   | List the tools the agent called, for the app's trace            |
-| **Research agent**   | One call: a tool loop that ends in a structured answer          |
+| **Research agent**   | A tool loop that ends in a structured answer                    |
 | **Composition root** | Wire all dependencies together                                  |
 | **Route handler**    | Connect the agent flow to the HTTP endpoint                     |
 

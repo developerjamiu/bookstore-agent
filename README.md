@@ -77,7 +77,7 @@ music-store-agent/
 │   │   ├── data/music_store.db          # Pre-seeded SQLite database
 │   │   ├── lib/src/
 │   │   │   ├── agent/
-│   │   │   │   ├── research_agent.dart  # One-call agent: tool loop + JSON answer
+│   │   │   │   ├── research_agent.dart  # Agent: tool loop + JSON answer
 │   │   │   │   └── setup.dart           # Composition root (DI wiring)
 │   │   │   ├── tools/
 │   │   │   │   ├── list_tables.dart     # Tool: discover database tables
@@ -247,13 +247,13 @@ This project demonstrates all three properties:
 The model **cannot skip the tools** — it has never seen this database. Every
 answer must come from actual query results, not the model's training data.
 
-### One call: tools plus a JSON answer
+### Tools plus a JSON answer
 
-The agent makes a single `generate` call with the three tools and
-`outputSchema`. The model calls tools as often as it needs (up to
-`maxTurns: 10`), then replies in the `ResearchOutput` shape. With Gemini this
-combination is a preview feature for Gemini 3 and later models. It was
-checked live with `gemini-3.5-flash-lite`. If the model never ran a query,
+The agent's `generate` call gets the three tools and `outputSchema`. The
+model calls tools as often as it needs (up to `maxTurns: 10`), then replies in
+the `ResearchOutput` shape. With Gemini this combination is a preview feature
+for Gemini 3 and later models. It was checked live with
+`gemini-3.5-flash-lite`. If the model never ran a query,
 the answer gets low confidence, and if it hits the turn limit, the agent says
 it couldn't finish.
 
@@ -278,7 +278,7 @@ it couldn't finish.
 | **Schemas** — `table_name_input.dart`, `sql_query_input.dart`, `research_output.dart`, `research_result.dart`, `tool_call.dart` | Define the data shapes the agent works with using Schemantic                  |
 | **Tools** — `list_tables.dart`, `describe_table.dart`, `run_query.dart`                                                         | Write the logic AND register each tool with Genkit via `ai.defineTool()`      |
 | **Message helpers** — `message_helpers.dart`                                                                                    | List the tools the agent called, for the app's trace                          |
-| **Agent** — `research_agent.dart`                                                                                               | One generate call: tool-calling loop + structured JSON answer                 |
+| **Agent** — `research_agent.dart`                                                                                               | Tool-calling loop that ends in a structured JSON answer                       |
 | **Setup** — `setup.dart`                                                                                                        | Wire everything together in the composition root                              |
 | **Route update** — `research.dart`                                                                                              | Replace the placeholder response with the real agent flow                     |
 | **Agent tests** — `research_agent_test.dart`                                                                                    | Test the agent using `ai.defineModel()` with fake responses                   |
@@ -297,7 +297,7 @@ it couldn't finish.
 - **Genkit tools** — `ai.defineTool()` with typed input/output schemas
 - **Genkit flows** — `ai.defineFlow()` for composable, traceable operations
 - **Agentic tool loop** — `maxTurns`, autonomous tool selection, termination
-- **Tools plus structured output**: one call that researches and answers as JSON
+- **Tools plus structured output**: `generate` with both `tools` and `outputSchema`
 - **Fake model testing** — `ai.defineModel()` for deterministic tests without API calls
 - **Constructor DI** — every class receives dependencies via constructor
 - **Composition root** — one place wires everything together

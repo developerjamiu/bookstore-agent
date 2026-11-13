@@ -794,7 +794,7 @@ How it works:
 
    You should get JSON with an `answer` that names Rock (31 tracks), the SQL behind it in `sources`, and the tools the agent called in `toolCalls`. The wording changes from run to run.
 
-4. Ask the same question in the Flutter app. You get the agent's answer instead of the placeholder.
+4. Ask the same question in the Flutter app from Step 0. If you closed it, run `flutter run` in `packages/client` again. You get the agent's answer instead of the placeholder.
 
 If curl prints `{"error":"Agent failed. Check server logs for details."}` and the server log shows `apiKey must be set to an API key`, the server can't see your key. Run the `export` line in the server's terminal, then restart the server.
 
@@ -814,30 +814,16 @@ You now have a working agent that answers from real query results.
 | **Research agent**   | A tool loop that ends in a structured answer                    |
 | **Setup**            | Create the tools and the agent, and connect them                |
 | **Route handler**    | Connect the agent flow to the HTTP endpoint                     |
+| **Entrypoint**       | Start the server with the agent behind the route                |
 
-### Try these questions
+### Try it in the app
 
-```sh
-# Simple lookup
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}'
+Ask these questions in the Flutter app. For each one, look at the answer, its confidence badge, **Queries used**, and the **Agent trace**.
 
-# Multi-table JOINs
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"Who is the top spending customer and what did they buy?"}'
-
-# Many-to-many relationship
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"What songs are in the Chill Jazz playlist?"}'
-
-# Out of scope: the agent should refuse politely
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"What is the weather today?"}'
-```
+- **"What artists are in the database?"** A simple lookup on one table.
+- **"Who is the top spending customer and what did they buy?"** The agent joins customers, invoices, invoice lines and tracks.
+- **"What songs are in the Chill Jazz playlist?"** The agent goes through `playlist_tracks`, the table that links playlists to tracks.
+- **"What is the weather today?"** The database can't answer this, so the agent says so with low confidence.
 
 ### What's Next
 

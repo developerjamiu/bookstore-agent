@@ -11,6 +11,9 @@ void main() {
   late Genkit ai;
   late ResearchAgent agent;
 
+  /// Builds an agent that talks to the fake model named [model].
+  late ResearchAgent Function(String model) agentFor;
+
   setUp(() {
     ai = Genkit();
 
@@ -29,8 +32,9 @@ void main() {
       description: 'List tables.',
       inputSchema: SchemanticType.voidSchema(),
       outputSchema: SchemanticType.string(),
-      fn: (_, _) async =>
-          'Tables in the database:\n- artists\n- albums\n- tracks\n- genres',
+      fn: (_, _) async => .response(
+        'Tables in the database:\n- artists\n- albums\n- tracks\n- genres',
+      ),
     );
 
     final describeTableTool = ai.defineTool(
@@ -38,10 +42,11 @@ void main() {
       description: 'Describe a table.',
       inputSchema: TableNameInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) async =>
-          'Columns in "${input.table}":\n'
-          '- ArtistId INTEGER PRIMARY KEY\n'
-          '- Name TEXT NOT NULL',
+      fn: (input, _) async => .response(
+        'Columns in "${input.table}":\n'
+        '- ArtistId INTEGER PRIMARY KEY\n'
+        '- Name TEXT NOT NULL',
+      ),
     );
 
     final runQueryTool = ai.defineTool(
@@ -49,20 +54,23 @@ void main() {
       description: 'Run a SQL query.',
       inputSchema: SqlQueryInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) async => jsonEncode([
-        {'Name': 'AC/DC'},
-        {'Name': 'Led Zeppelin'},
-        {'Name': 'Queen'},
-      ]),
+      fn: (input, _) async => .response(
+        jsonEncode([
+          {'Name': 'AC/DC'},
+          {'Name': 'Led Zeppelin'},
+          {'Name': 'Queen'},
+        ]),
+      ),
     );
 
-    agent = ResearchAgent(
+    agentFor = (model) => ResearchAgent(
       ai: ai,
-      model: modelRef('fake/model'),
+      model: modelRef(model),
       listTablesTool: listTablesTool,
       describeTableTool: describeTableTool,
       runQueryTool: runQueryTool,
     );
+    agent = agentFor('fake/model');
   });
 
   tearDown(() async => ai.shutdown());
@@ -97,7 +105,91 @@ void main() {
       expect(result.confidence, 'low');
     });
   });
+
+  group('ResearchAgent failures', () {
+    test('throws the model\'s GenkitException when the model fails', () async {
+      ai.defineModel(
+        name: 'fake/overloaded',
+        fn: (_, _) async => throw GenkitException(
+          'This model is currently experiencing high demand.',
+          status: StatusCode.unavailable,
+        ),
+      );
+
+      await expectLater(
+        agentFor('fake/overloaded').research('How many artists?'),
+        throwsA(
+          isA<GenkitException>()
+              .having((e) => e.status, 'status', StatusCode.unavailable)
+              .having((e) => e.message, 'message', contains('high demand')),
+        ),
+      );
+    });
+
+    test(
+      'throws a GenkitException when the model throws anything else',
+      () async {
+        ai.defineModel(
+          name: 'fake/broken',
+          fn: (_, _) async => throw StateError('model failed on purpose'),
+        );
+
+        await expectLater(
+          agentFor('fake/broken').research('How many artists?'),
+          throwsA(
+            isA<GenkitException>()
+                .having((e) => e.status, 'status', StatusCode.internal)
+                .having((e) => e.message, 'message', contains('on purpose')),
+          ),
+        );
+      },
+    );
+
+    test('throws when the synthesis reply is not JSON', () async {
+      ai.defineModel(
+        name: 'fake/prose',
+        fn: (request, _) async => _textResponse(
+          request.output != null ? 'Sorry, no JSON today.' : 'No data.',
+        ),
+      );
+
+      await expectLater(
+        agentFor('fake/prose').research('How many artists?'),
+        throwsA(
+          isA<GenkitException>().having(
+            (e) => e.message,
+            'message',
+            contains('expected schema'),
+          ),
+        ),
+      );
+    });
+
+    test('throws when the synthesis reply does not match the schema', () async {
+      ai.defineModel(
+        name: 'fake/wrong-shape',
+        fn: (request, _) async => _textResponse(
+          request.output != null ? '{"answer": 42}' : 'No data.',
+        ),
+      );
+
+      // The JSON parses, so Genkit returns it as output. Reading the
+      // mistyped field then throws, and the route answers 500 for that too.
+      await expectLater(
+        agentFor('fake/wrong-shape').research('How many artists?'),
+        throwsA(isA<TypeError>()),
+      );
+    });
+  });
 }
+
+ModelResponse _textResponse(String text) => ModelResponse(
+  finishReason: FinishReason.stop,
+  message: Message(
+    role: Role.model,
+    content: [TextPart(text: text)],
+  ),
+);
 
 ModelResponse _toolCallingResponse(ModelRequest request) {
   final question = _userQuestion(request);

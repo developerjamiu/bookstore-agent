@@ -28,7 +28,7 @@ class RunQueryTool {
           'SELECT statements are allowed.',
       inputSchema: SqlQueryInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => query(input),
+      fn: (input, _) async => .response(await query(input)),
     );
   }
 

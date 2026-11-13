@@ -27,7 +27,7 @@ class DescribeTableTool {
           'to understand the schema before writing a query.',
       inputSchema: TableNameInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => describe(input),
+      fn: (input, _) async => .response(await describe(input)),
     );
   }
 

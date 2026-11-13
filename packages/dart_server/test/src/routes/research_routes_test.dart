@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:dart_server/src/agent/research_agent.dart';
 import 'package:dart_server/src/middleware/cors.dart';
 import 'package:dart_server/src/routes/research.dart';
 import 'package:dart_server/src/schemas/research_result.dart';
+import 'package:dart_server/src/schemas/sql_query_input.dart';
+import 'package:dart_server/src/schemas/table_name_input.dart';
 import 'package:dart_server/src/schemas/tool_call.dart';
 import 'package:genkit/genkit.dart';
-import 'package:relic/relic.dart';
+import 'package:relic/relic.dart' hide Message;
 import 'package:schemantic/schemantic.dart';
 import 'package:test/test.dart';
 
@@ -62,13 +65,15 @@ void main() {
   /// way `bin/server.dart` mounts them.
   ///
   /// The lines the route prints go to [printed] instead of the test output.
+  /// The route runs [flow] when given, else a flow that answers with [answer].
   Future<Response> send(
     Method method, {
     Headers? headers,
     Body? body,
     Future<ResearchResult> Function()? answer,
+    ResearchFlow? flow,
   }) {
-    final flow = defineResearchFlow(answer ?? () async => _cannedResult());
+    flow ??= defineResearchFlow(answer ?? () async => _cannedResult());
     final routes = ResearchRoutes(researchFlow: flow);
     final app = RelicApp()
       ..use('/', cors())
@@ -171,38 +176,173 @@ void main() {
       });
     }
 
-    final genkitErrors = <String, (int, String)>{
-      'Quota exceeded for this model.': (
+    final genkitErrors = <StatusCode, (int, String)>{
+      StatusCode.resourceExhausted: (
         429,
         'API quota exceeded. Please try again later.',
       ),
-      'RESOURCE_EXHAUSTED: too many requests': (
-        429,
-        'API quota exceeded. Please try again later.',
-      ),
-      'This model is currently experiencing high demand.': (
+      StatusCode.unavailable: (
         503,
         'Model is temporarily unavailable. Please retry.',
       ),
-      'apiKey must be set to an API key': (
+      StatusCode.invalidArgument: (
+        500,
+        'Agent failed. Check server logs for details.',
+      ),
+      StatusCode.internal: (
         500,
         'Agent failed. Check server logs for details.',
       ),
     };
-    for (final MapEntry(key: error, value: (statusCode, message))
+    for (final MapEntry(key: status, value: (statusCode, message))
         in genkitErrors.entries) {
-      test('answers $statusCode when the flow fails with "$error"', () async {
+      test(
+        'answers $statusCode when the flow fails with ${status.wireName}',
+        () async {
+          final response = await send(
+            Method.post,
+            body: _json({'question': 'Which genre has the most tracks?'}),
+            answer: () async =>
+                throw GenkitException('failed on purpose', status: status),
+          );
+
+          await expectJsonError(response, statusCode, message);
+          expect(printed.single, startsWith('Genkit error: '));
+          expect(printed.single, contains('failed on purpose'));
+          expect(printed.single, contains(status.wireName));
+        },
+      );
+    }
+
+    test('maps by status, not by the words in the message', () async {
+      final response = await send(
+        Method.post,
+        body: _json({'question': 'Which genre has the most tracks?'}),
+        answer: () async => throw GenkitException(
+          'RESOURCE_EXHAUSTED: quota exceeded, high demand',
+          status: StatusCode.internal,
+        ),
+      );
+
+      await expectJsonError(
+        response,
+        500,
+        'Agent failed. Check server logs for details.',
+      );
+    });
+
+    group('with the research agent and a fake model', () {
+      /// The research agent's flow, on a fake model that answers with [fn].
+      ResearchFlow agentFlow(
+        Future<ModelResponse> Function(ModelRequest request) fn,
+      ) {
+        ai.defineModel(name: 'fake/model', fn: (request, _) => fn(request));
+        Tool<I, String> tool<I>(String name, SchemanticType<I> input) =>
+            ai.defineTool(
+              name: name,
+              description: name,
+              inputSchema: input,
+              outputSchema: SchemanticType.string(),
+              fn: (_, _) async => .response('[]'),
+            );
+        return ResearchAgent(
+          ai: ai,
+          model: modelRef('fake/model'),
+          listTablesTool: tool('listTables', SchemanticType.voidSchema()),
+          describeTableTool: tool('describeTable', TableNameInput.$schema),
+          runQueryTool: tool('runQuery', SqlQueryInput.$schema),
+        )();
+      }
+
+      ModelResponse text(String text) => ModelResponse(
+        finishReason: FinishReason.stop,
+        message: Message(
+          role: Role.model,
+          content: [TextPart(text: text)],
+        ),
+      );
+
+      test('answers 500 when the model fails', () async {
         final response = await send(
           Method.post,
-          body: _json({'question': 'Which genre has the most tracks?'}),
-          answer: () async => throw GenkitException(error),
+          body: _json({'question': 'How many artists are there?'}),
+          flow: agentFlow(
+            (_) async => throw GenkitException(
+              'apiKey must be set to an API key',
+              status: StatusCode.invalidArgument,
+            ),
+          ),
         );
 
-        await expectJsonError(response, statusCode, message);
+        await expectJsonError(
+          response,
+          500,
+          'Agent failed. Check server logs for details.',
+        );
         expect(printed.single, startsWith('Genkit error: '));
-        expect(printed.single, contains(error));
+        expect(printed.single, contains('apiKey must be set'));
       });
-    }
+
+      test('answers 429 when the model reports an exhausted quota', () async {
+        final response = await send(
+          Method.post,
+          body: _json({'question': 'How many artists are there?'}),
+          flow: agentFlow(
+            (_) async => throw GenkitException(
+              'Quota exceeded for this model.',
+              status: StatusCode.resourceExhausted,
+            ),
+          ),
+        );
+
+        await expectJsonError(
+          response,
+          429,
+          'API quota exceeded. Please try again later.',
+        );
+      });
+
+      test('answers 500 when the synthesis reply does not parse', () async {
+        final response = await send(
+          Method.post,
+          body: _json({'question': 'How many artists are there?'}),
+          flow: agentFlow(
+            (request) async => text(
+              request.output != null ? 'Sorry, no JSON today.' : 'Done.',
+            ),
+          ),
+        );
+
+        await expectJsonError(
+          response,
+          500,
+          'Agent failed. Check server logs for details.',
+        );
+        expect(printed.single, startsWith('Genkit error: '));
+        expect(printed.single, contains('expected schema'));
+      });
+
+      test(
+        'answers 500 when the synthesis reply has the wrong shape',
+        () async {
+          final response = await send(
+            Method.post,
+            body: _json({'question': 'How many artists are there?'}),
+            flow: agentFlow(
+              (request) async =>
+                  text(request.output != null ? '{"answer": 42}' : 'Done.'),
+            ),
+          );
+
+          await expectJsonError(
+            response,
+            500,
+            'Agent failed. Check server logs for details.',
+          );
+          expect(printed.single, startsWith('Unexpected error: '));
+        },
+      );
+    });
 
     test('answers 500 when the flow throws any other error', () async {
       final response = await send(

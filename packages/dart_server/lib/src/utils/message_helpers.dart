@@ -41,7 +41,7 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
 /// [Agent summary]
 /// The database contains 15 artists.
 /// ```
-String buildResearchNotes(GenerateResponseHelper response) {
+String buildResearchNotes(GenerateResult response) {
   final buffer = StringBuffer();
 
   for (final message in response.messages) {
@@ -85,8 +85,10 @@ String? _findQueryForResponse(
       if (request == null) continue;
       if (request.toolRequest.ref == toolResponse.ref &&
           request.toolRequest.name == 'runQuery') {
-        final input = request.toolRequest.input;
-        return input?['sql'] as String?;
+        if (request.toolRequest.input case {'sql': final String sql}) {
+          return sql;
+        }
+        return null;
       }
     }
   }

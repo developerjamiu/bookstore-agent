@@ -21,7 +21,7 @@ class ListTablesTool {
           'what data is available before writing any queries.',
       inputSchema: SchemanticType.voidSchema(),
       outputSchema: SchemanticType.string(),
-      fn: (_, _) => list(),
+      fn: (_, _) async => .response(await list()),
     );
   }
 

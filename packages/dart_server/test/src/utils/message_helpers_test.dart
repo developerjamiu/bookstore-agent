@@ -190,7 +190,7 @@ void main() {
   });
 }
 
-GenerateResponseHelper _buildResponse({
+GenerateResult _buildResponse({
   required List<Message> requestMessages,
   required String finalText,
 }) {
@@ -202,7 +202,7 @@ GenerateResponseHelper _buildResponse({
     ),
   );
 
-  return GenerateResponseHelper(
+  return GenerateResult(
     modelResponse,
     request: ModelRequest(messages: requestMessages),
   );

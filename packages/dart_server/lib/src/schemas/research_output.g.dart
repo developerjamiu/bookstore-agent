@@ -7,6 +7,7 @@ part of 'research_output.dart';
 // **************************************************************************
 
 base class ResearchOutput {
+  /// Creates a [ResearchOutput] from a JSON map.
   factory ResearchOutput.fromJson(Map<String, dynamic> json) =>
       $schema.parse(json);
 
@@ -22,6 +23,7 @@ base class ResearchOutput {
 
   late final Map<String, dynamic> _json;
 
+  /// The JSON schema and type descriptor for [ResearchOutput].
   static const SchemanticType<ResearchOutput> $schema =
       _ResearchOutputTypeFactory();
 
@@ -54,6 +56,7 @@ base class ResearchOutput {
     return _json.toString();
   }
 
+  /// Serializes this [ResearchOutput] to a JSON map.
   Map<String, dynamic> toJson() {
     return _json;
   }
@@ -70,25 +73,27 @@ base class _ResearchOutputTypeFactory extends SchemanticType<ResearchOutput> {
   @override
   JsonSchemaMetadata get schemaMetadata => JsonSchemaMetadata(
     name: 'ResearchOutput',
-    definition: $Schema
-        .object(
-          properties: {
-            'answer': $Schema.string(
-              description: 'The synthesized answer to the question',
-            ),
-            'sources': $Schema.list(
-              description: 'SQL queries used to produce the answer',
-              items: $Schema.string(),
-            ),
-            'confidence': $Schema.string(
-              description: 'How confident the agent is in the answer',
-              enumValues: ['low', 'medium', 'high'],
-            ),
-          },
-          required: ['answer', 'sources', 'confidence'],
-          description: 'Synthesized answer produced by the research agent',
-        )
-        .value,
+    definition: <String, Object?>{
+      'type': 'object',
+      'description': 'Synthesized answer produced by the research agent',
+      'properties': <String, Object?>{
+        'answer': <String, Object?>{
+          'type': 'string',
+          'description': 'The synthesized answer to the question',
+        },
+        'sources': <String, Object?>{
+          'type': 'array',
+          'description': 'SQL queries used to produce the answer',
+          'items': <String, Object?>{'type': 'string'},
+        },
+        'confidence': <String, Object?>{
+          'type': 'string',
+          'description': 'How confident the agent is in the answer',
+          'enum': ['low', 'medium', 'high'],
+        },
+      },
+      'required': ['answer', 'sources', 'confidence'],
+    },
     dependencies: [],
   );
 }

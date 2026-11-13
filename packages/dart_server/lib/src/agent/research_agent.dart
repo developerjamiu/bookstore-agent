@@ -48,7 +48,7 @@ class ResearchAgent {
     required Tool<TableNameInput, String> describeTableTool,
     required Tool<SqlQueryInput, String> runQueryTool,
   }) : _ai = ai,
-       _model = model ?? googleAI.gemini('gemini-3.1-flash-lite-preview'),
+       _model = model ?? googleAI.gemini('gemini-3.5-flash-lite'),
        _listTablesTool = listTablesTool,
        _describeTableTool = describeTableTool,
        _runQueryTool = runQueryTool;
@@ -77,9 +77,9 @@ class ResearchAgent {
     );
   }
 
-  Future<GenerateResponseHelper> _runResearchPhase(String question) async {
+  Future<GenerateResult> _runResearchPhase(String question) async {
     try {
-      return await _ai.generate(
+      final response = await _ai.generate(
         model: _model,
         messages: [
           Message(
@@ -94,10 +94,14 @@ class ResearchAgent {
         tools: [_listTablesTool, _describeTableTool, _runQueryTool],
         maxTurns: 10,
       );
+      // A maxTurns overrun now resolves as an aborted result instead of
+      // throwing. Treat it as a failure here so the catch below still runs.
+      _throwIfFailed(response, alsoAborted: true);
+      return response;
     } on GenkitException catch (e) {
       if (!e.message.contains('max turns')) rethrow;
 
-      return _ai.generate(
+      final response = await _ai.generate(
         model: _model,
         messages: [
           Message(
@@ -117,6 +121,8 @@ class ResearchAgent {
           ),
         ],
       );
+      _throwIfFailed(response);
+      return response;
     }
   }
 
@@ -140,6 +146,15 @@ class ResearchAgent {
       ],
       outputSchema: ResearchOutput.$schema,
     );
+    _throwIfFailed(response);
+
+    // The reply did not parse as the schema. Genkit reports that as an error
+    // on the result instead of throwing, so throw it here: the route must
+    // answer 500 rather than a canned 200.
+    final error = response.error;
+    if (response.output == null && error != null) {
+      throw GenkitException(error.message, status: _statusOf(error));
+    }
 
     return response.output ??
         ResearchOutput(
@@ -147,5 +162,38 @@ class ResearchAgent {
           sources: const [],
           confidence: 'low',
         );
+  }
+
+  /// Throws when [response] reports a failed generation.
+  ///
+  /// Genkit 1.0 no longer throws when the model or a tool fails. It returns
+  /// a result with `finishReason: failed`, the thrown object as `cause` and
+  /// a structured `error`. Rethrowing keeps the route's error handling, which
+  /// maps a [GenkitException] status to an HTTP status.
+  ///
+  /// With [alsoAborted], an aborted result (a maxTurns overrun) throws too.
+  static void _throwIfFailed(
+    GenerateResult response, {
+    bool alsoAborted = false,
+  }) {
+    final failed =
+        response.finishReason == FinishReason.failed ||
+        (alsoAborted && response.finishReason == FinishReason.aborted);
+    if (!failed) return;
+
+    final cause = response.cause;
+    if (cause is GenkitException) throw cause;
+
+    final error = response.error;
+    throw GenkitException(
+      error?.message ?? 'Generation failed.',
+      status: error == null ? null : _statusOf(error),
+      cause: cause,
+    );
+  }
+
+  static StatusCode? _statusOf(RuntimeError error) {
+    final status = error.status;
+    return status == null ? null : StatusCode.fromWireName(status);
   }
 }

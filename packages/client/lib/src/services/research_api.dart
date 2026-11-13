@@ -39,8 +39,7 @@ class ResearchApi {
   final Uri baseUrl;
   final http.Client _client;
 
-  ResearchApi({required this.baseUrl, required http.Client client})
-    : _client = client;
+  ResearchApi({required this.baseUrl, required this._client});
 
   Future<ResearchResult> ask(String question) async {
     final response = await _client.post(

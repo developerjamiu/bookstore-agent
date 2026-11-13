@@ -263,8 +263,6 @@ Create the three tools below. Each is a class with three parts:
 - `call()`, which registers the tool with Genkit
 - A plain method (`list`, `describe`, `query`) that holds the logic, which tests call directly
 
-In the code, `.response(...)` wraps the tool's result in the type Genkit expects (it's short for `ToolResult.response(...)`). `required this._ai` sets the private field `_ai`, but callers still write `ai:`.
-
 ### ListTablesTool
 
 Create `packages/dart_server/lib/src/tools/list_tables.dart`, which lets the agent discover the tables:
@@ -315,6 +313,8 @@ class ListTablesTool {
   }
 }
 ````
+
+> Notice: `.response(...)` wraps the tool's result in the type Genkit expects (it's short for `ToolResult.response(...)`). `required this._ai` sets the private field `_ai`, but callers still write `ai:`.
 
 ### DescribeTableTool
 

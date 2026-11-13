@@ -131,11 +131,11 @@ You'll build it bottom-up: schemas, tools, message helpers, the agent, then the 
 
 ## Step 1: Define the Schemas
 
-A schema defines the shape of some data: what a tool accepts, or what the agent returns. Genkit sends the tool schemas and the answer schema to Gemini, so the model reads every `description` you write. Write them as instructions that tell Gemini what each field means.
+A schema defines the shape of some data, such as what a tool accepts or what the agent returns.
 
 In this step you'll:
 
-1. **Create five schema files.** Each is an abstract class whose name starts with `$`, like `$TableNameInput`. When one schema uses another, refer to it by its `$` name, like `List<$ToolCall>`.
+1. **Create five schema files.** Each is an abstract class whose name starts with `$`, like `$TableNameInput`. Gemini reads every `description`, so write each one as an instruction that says what the field means. When one schema uses another, refer to it by its `$` name, like `List<$ToolCall>`.
 2. **Run `build_runner`.** [Schemantic](https://pub.dev/packages/schemantic), a code generator, turns each `$` class into a real class (`TableNameInput`) in a `.g.dart` file, with `fromJson`, `toJson` and the `$schema` that Genkit sends to the model.
 
 ### Tool input schemas

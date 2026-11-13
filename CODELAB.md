@@ -109,16 +109,16 @@ The model (Gemini) chooses every step. Your code only provides the tools.
 
 After the loop, a second model call turns the query results into a structured answer with the text, the SQL behind it and a confidence level. If no query ran, for example for a weather question, the agent skips that call and replies with low confidence.
 
-What happens when the app sends a question:
+What happens when the app sends a question (errors left out):
 
 ```mermaid
 flowchart TD
     Q["Flutter app sends a question"] --> R["routes/research.dart<br/>POST /api/research"]
-    R --> P1["research_agent.dart<br/>Phase 1: tool loop, up to 10 turns"]
-    P1 <--> T["Tools<br/>listTables, describeTable, runQuery"]
-    P1 --> D{"Did runQuery run?"}
+    R --> P1["Phase 1: research<br/>Gemini picks tools, up to 10 turns"]
+    P1 <-->|"asks for a tool, gets the result"| T["Your tools, run by Genkit<br/>listTables, describeTable, runQuery"]
+    P1 --> D{"Did it call runQuery?"}
     D -- No --> L["Reply directly<br/>with low confidence"]
-    D -- Yes --> P2["Phase 2: synthesis<br/>outputSchema: ResearchOutput"]
+    D -- Yes --> P2["Phase 2: synthesis<br/>Gemini writes a ResearchOutput"]
     L --> A["JSON back to the app<br/>answer, sources, confidence, tool trace"]
     P2 --> A
 ```
@@ -131,7 +131,7 @@ You'll build it bottom-up: schemas, tools, message helpers, the agent, then the 
 
 ## Step 1: Define the Schemas
 
-Schemas describe the data your tools take and your agent returns. Genkit sends the tool input schemas and `ResearchOutput` to the model, so their `description` strings are instructions to it, not comments.
+A schema defines the shape of some data: what a tool accepts, or what the agent returns. Genkit sends the tool schemas and the answer schema to Gemini, so the model reads every `description` you write. Write them as instructions that tell Gemini what each field means.
 
 In this step you'll:
 

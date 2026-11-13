@@ -11,9 +11,9 @@
     "typecheck": "tsc -p . --noEmit"
   },
   "dependencies": {
-    "@genkit-ai/google-genai": "^1.32.0",
+    "@genkit-ai/google-genai": "^1.44.0",
     "better-sqlite3": "^12.8.0",
-    "genkit": "^1.32.0"
+    "genkit": "^1.44.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

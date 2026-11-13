@@ -92,7 +92,8 @@ void main() {
       await tester.tap(find.byIcon(Icons.send));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('ResearchApiException'), findsOneWidget);
+      expect(find.text('Server error'), findsOneWidget);
+      expect(find.textContaining('ResearchApiException'), findsNothing);
     });
 
     testWidgets('does not submit an empty question', (tester) async {

@@ -17,7 +17,7 @@ class RunQueryTool {
   final Genkit _ai;
   final Database _db;
 
-  RunQueryTool({required Genkit ai, required Database db}) : _ai = ai, _db = db;
+  RunQueryTool({required this._ai, required this._db});
 
   Tool<SqlQueryInput, String> call() {
     return _ai.defineTool(
@@ -28,7 +28,7 @@ class RunQueryTool {
           'SELECT statements are allowed.',
       inputSchema: SqlQueryInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => query(input),
+      fn: (input, _) async => .response(await query(input)),
     );
   }
 

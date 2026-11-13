@@ -7,6 +7,7 @@ part of 'research_result.dart';
 // **************************************************************************
 
 base class ResearchResult {
+  /// Creates a [ResearchResult] from a JSON map.
   factory ResearchResult.fromJson(Map<String, dynamic> json) =>
       $schema.parse(json);
 
@@ -28,6 +29,7 @@ base class ResearchResult {
 
   late final Map<String, dynamic> _json;
 
+  /// The JSON schema and type descriptor for [ResearchResult].
   static const SchemanticType<ResearchResult> $schema =
       _ResearchResultTypeFactory();
 
@@ -62,7 +64,7 @@ base class ResearchResult {
   }
 
   set toolCalls(List<ToolCall> value) {
-    _json['toolCalls'] = value.toList();
+    _json['toolCalls'] = value.map((e) => e.toJson()).toList();
   }
 
   @override
@@ -70,6 +72,7 @@ base class ResearchResult {
     return _json.toString();
   }
 
+  /// Serializes this [ResearchResult] to a JSON map.
   Map<String, dynamic> toJson() {
     return _json;
   }
@@ -86,29 +89,32 @@ base class _ResearchResultTypeFactory extends SchemanticType<ResearchResult> {
   @override
   JsonSchemaMetadata get schemaMetadata => JsonSchemaMetadata(
     name: 'ResearchResult',
-    definition: $Schema
-        .object(
-          properties: {
-            'answer': $Schema.string(
-              description: 'The synthesized answer to the question',
-            ),
-            'sources': $Schema.list(
-              description: 'SQL queries used to produce the answer',
-              items: $Schema.string(),
-            ),
-            'confidence': $Schema.string(
-              description: 'How confident the agent is in the answer',
-              enumValues: ['low', 'medium', 'high'],
-            ),
-            'toolCalls': $Schema.list(
-              description: 'Tools the agent invoked while researching',
-              items: $Schema.fromMap({'\$ref': r'#/$defs/ToolCall'}),
-            ),
-          },
-          required: ['answer', 'sources', 'confidence', 'toolCalls'],
-          description: 'Final result returned by the research agent flow',
-        )
-        .value,
+    definition: <String, Object?>{
+      'type': 'object',
+      'description': 'Final result returned by the research agent flow',
+      'properties': <String, Object?>{
+        'answer': <String, Object?>{
+          'type': 'string',
+          'description': 'The synthesized answer to the question',
+        },
+        'sources': <String, Object?>{
+          'type': 'array',
+          'description': 'SQL queries used to produce the answer',
+          'items': <String, Object?>{'type': 'string'},
+        },
+        'confidence': <String, Object?>{
+          'type': 'string',
+          'description': 'How confident the agent is in the answer',
+          'enum': ['low', 'medium', 'high'],
+        },
+        'toolCalls': <String, Object?>{
+          'type': 'array',
+          'description': 'Tools the agent invoked while researching',
+          'items': <String, Object?>{r'$ref': r'#/$defs/ToolCall'},
+        },
+      },
+      'required': ['answer', 'sources', 'confidence', 'toolCalls'],
+    },
     dependencies: [ToolCall.$schema],
   );
 }

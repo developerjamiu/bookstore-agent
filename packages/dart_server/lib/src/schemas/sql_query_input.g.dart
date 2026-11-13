@@ -7,6 +7,7 @@ part of 'sql_query_input.dart';
 // **************************************************************************
 
 base class SqlQueryInput {
+  /// Creates a [SqlQueryInput] from a JSON map.
   factory SqlQueryInput.fromJson(Map<String, dynamic> json) =>
       $schema.parse(json);
 
@@ -18,6 +19,7 @@ base class SqlQueryInput {
 
   late final Map<String, dynamic> _json;
 
+  /// The JSON schema and type descriptor for [SqlQueryInput].
   static const SchemanticType<SqlQueryInput> $schema =
       _SqlQueryInputTypeFactory();
 
@@ -34,6 +36,7 @@ base class SqlQueryInput {
     return _json.toString();
   }
 
+  /// Serializes this [SqlQueryInput] to a JSON map.
   Map<String, dynamic> toJson() {
     return _json;
   }
@@ -50,18 +53,17 @@ base class _SqlQueryInputTypeFactory extends SchemanticType<SqlQueryInput> {
   @override
   JsonSchemaMetadata get schemaMetadata => JsonSchemaMetadata(
     name: 'SqlQueryInput',
-    definition: $Schema
-        .object(
-          properties: {
-            'sql': $Schema.string(
-              description:
-                  'A read-only SQL SELECT statement. No INSERT, UPDATE, DELETE, or DDL statements are allowed.',
-            ),
-          },
-          required: ['sql'],
-          description: 'A SQL query to execute against the database',
-        )
-        .value,
+    definition: <String, Object?>{
+      'type': 'object',
+      'description': 'A SQL query to execute against the database',
+      'properties': <String, Object?>{
+        'sql': <String, Object?>{
+          'type': 'string',
+          'description': 'A read-only SQL SELECT statement. No INSERT, UPDATE, DELETE, or DDL statements are allowed.',
+        },
+      },
+      'required': ['sql'],
+    },
     dependencies: [],
   );
 }

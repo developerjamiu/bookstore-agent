@@ -7,6 +7,7 @@ part of 'table_name_input.dart';
 // **************************************************************************
 
 base class TableNameInput {
+  /// Creates a [TableNameInput] from a JSON map.
   factory TableNameInput.fromJson(Map<String, dynamic> json) =>
       $schema.parse(json);
 
@@ -18,6 +19,7 @@ base class TableNameInput {
 
   late final Map<String, dynamic> _json;
 
+  /// The JSON schema and type descriptor for [TableNameInput].
   static const SchemanticType<TableNameInput> $schema =
       _TableNameInputTypeFactory();
 
@@ -34,6 +36,7 @@ base class TableNameInput {
     return _json.toString();
   }
 
+  /// Serializes this [TableNameInput] to a JSON map.
   Map<String, dynamic> toJson() {
     return _json;
   }
@@ -50,17 +53,17 @@ base class _TableNameInputTypeFactory extends SchemanticType<TableNameInput> {
   @override
   JsonSchemaMetadata get schemaMetadata => JsonSchemaMetadata(
     name: 'TableNameInput',
-    definition: $Schema
-        .object(
-          properties: {
-            'table': $Schema.string(
-              description: 'The name of the table, as returned by listTables.',
-            ),
-          },
-          required: ['table'],
-          description: 'Input specifying a database table to inspect',
-        )
-        .value,
+    definition: <String, Object?>{
+      'type': 'object',
+      'description': 'Input specifying a database table to inspect',
+      'properties': <String, Object?>{
+        'table': <String, Object?>{
+          'type': 'string',
+          'description': 'The name of the table, as returned by listTables.',
+        },
+      },
+      'required': ['table'],
+    },
     dependencies: [],
   );
 }

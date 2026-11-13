@@ -53,6 +53,27 @@ void main() {
       expect(jsonDecode(calls[1].input), {'sql': 'SELECT 1'});
     });
 
+    test('records an input that is not a JSON object as "{}"', () {
+      final messages = [
+        Message(
+          role: Role.model,
+          content: [
+            ToolRequestPart(toolRequest: ToolRequest(name: 'listTables')),
+            ToolRequestPart(
+              toolRequest: ToolRequest(name: 'listTables', input: 'NULL'),
+            ),
+            ToolRequestPart(
+              toolRequest: ToolRequest(name: 'listTables', input: const [1]),
+            ),
+          ],
+        ),
+      ];
+
+      final calls = extractToolCalls(messages);
+
+      expect(calls.map((c) => c.input), ['{}', '{}', '{}']);
+    });
+
     test('returns empty list when no tool requests exist', () {
       final messages = [
         Message(
@@ -190,7 +211,7 @@ void main() {
   });
 }
 
-GenerateResponseHelper _buildResponse({
+GenerateResult _buildResponse({
   required List<Message> requestMessages,
   required String finalText,
 }) {
@@ -202,7 +223,7 @@ GenerateResponseHelper _buildResponse({
     ),
   );
 
-  return GenerateResponseHelper(
+  return GenerateResult(
     modelResponse,
     request: ModelRequest(messages: requestMessages),
   );

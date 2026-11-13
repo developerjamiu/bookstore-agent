@@ -9,9 +9,7 @@ class ListTablesTool {
   final Genkit _ai;
   final Database _db;
 
-  ListTablesTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  ListTablesTool({required this._ai, required this._db});
 
   Tool<void, String> call() {
     return _ai.defineTool(
@@ -21,7 +19,7 @@ class ListTablesTool {
           'what data is available before writing any queries.',
       inputSchema: SchemanticType.voidSchema(),
       outputSchema: SchemanticType.string(),
-      fn: (_, _) => list(),
+      fn: (_, _) async => .response(await list()),
     );
   }
 

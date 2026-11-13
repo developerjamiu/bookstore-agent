@@ -11,7 +11,7 @@ class AISetup {
   final Genkit _ai;
   final Database _db;
 
-  AISetup({required Genkit ai, required Database db}) : _ai = ai, _db = db;
+  AISetup({required this._ai, required this._db});
 
   Flow<String, ResearchResult, Never, Never> call() {
     final listTablesTool = ListTablesTool(ai: _ai, db: _db);

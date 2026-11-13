@@ -15,9 +15,7 @@ class DescribeTableTool {
   final Genkit _ai;
   final Database _db;
 
-  DescribeTableTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  DescribeTableTool({required this._ai, required this._db});
 
   Tool<TableNameInput, String> call() {
     return _ai.defineTool(
@@ -27,7 +25,7 @@ class DescribeTableTool {
           'to understand the schema before writing a query.',
       inputSchema: TableNameInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => describe(input),
+      fn: (input, _) async => .response(await describe(input)),
     );
   }
 

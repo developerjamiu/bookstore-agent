@@ -127,8 +127,8 @@ research_assistant/
 
 ## Prerequisites
 
-- **Dart SDK** >= 3.11 (`dart --version`)
-- **Flutter SDK** >= 3.27 (`flutter --version`)
+- **Dart SDK** >= 3.12 (`dart --version`)
+- **Flutter SDK** that bundles Dart 3.12 or later (`flutter --version`)
 - **Google AI API key** — get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (set `GOOGLE_API_KEY` for Dart; `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Node — never commit keys)
 - **Node.js** >= 20 (`node --version`) — only if you run `packages/nodejs_server`
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) to browse the database visually
@@ -163,7 +163,7 @@ extension. You'll see 9 tables with real data:
 ### 3. Run the tests (no API key needed)
 
 ```sh
-# Server: 46 tests using fake models and fake flows
+# Server: 64 tests using fake models and fake flows
 dart test packages/dart_server
 
 # Client — 14 tests using mock HTTP
@@ -263,8 +263,10 @@ answer must come from actual query results, not the model's training data.
 
 ### Two-phase generate pattern
 
-Gemini doesn't support `tools` + `outputSchema` in the same API call. The
-agent works around this with two separate calls:
+Sending `tools` and `outputSchema` in one Gemini call is only a preview
+feature. In a live test on 2026-11-13, a single call with both made the model
+loop on tool calls without ever answering. Two separate calls keep the
+research and the structured answer reliable:
 
 1. **Research phase** — tools enabled, `maxTurns: 10`, model explores freely
 2. **Synthesis phase** — `outputSchema` enabled, model produces structured

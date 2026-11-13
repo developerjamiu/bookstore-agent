@@ -18,12 +18,18 @@ class ResearchAgent {
       '- describeTable: see the columns and foreign keys of a table\n'
       '- runQuery: execute a read-only SQL SELECT query\n\n'
       'Strategy:\n'
-      '1. ALWAYS start by calling listTables — every question, no exceptions.\n'
+      '1. Use listTables to discover what tables exist.\n'
       '2. Call describeTable on relevant tables to understand columns and joins.\n'
       '3. Write and run SQL queries to find the answer.\n'
       '4. If a query returns unexpected results, try a different approach.\n'
       '5. If the question cannot be answered with the available data, say so.\n\n'
       'NEVER answer from your own knowledge. All answers must come from query results.';
+
+  static const _maxTurns = 10;
+
+  static const _outOfTurnsAnswer =
+      "I couldn't finish researching this question within the allowed "
+      'steps. Try asking something more specific.';
 
   static const _synthesisPrompt =
       'You are a database analyst. Using ONLY the research notes below, '
@@ -33,7 +39,9 @@ class ResearchAgent {
       'question, "medium" if partially, "low" if the data was not found.\n'
       '- In the sources array, include the SQL queries from the notes '
       'that produced the key results (the SELECT statements).\n'
-      '- Write a clear, natural-language answer that interprets the data.';
+      '- Write a clear, natural-language answer that interprets the data.\n'
+      '- When listing items such as tracks, name each distinct item once and '
+      'give a count when it appears more than once.';
 
   final Genkit _ai;
   final ModelRef<GeminiOptions> _model;
@@ -42,16 +50,12 @@ class ResearchAgent {
   final Tool<SqlQueryInput, String> _runQueryTool;
 
   ResearchAgent({
-    required Genkit ai,
+    required this._ai,
     ModelRef<GeminiOptions>? model,
-    required Tool<void, String> listTablesTool,
-    required Tool<TableNameInput, String> describeTableTool,
-    required Tool<SqlQueryInput, String> runQueryTool,
-  }) : _ai = ai,
-       _model = model ?? googleAI.gemini('gemini-3.1-flash-lite-preview'),
-       _listTablesTool = listTablesTool,
-       _describeTableTool = describeTableTool,
-       _runQueryTool = runQueryTool;
+    required this._listTablesTool,
+    required this._describeTableTool,
+    required this._runQueryTool,
+  }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
   Flow<String, ResearchResult, Never, Never> call() {
     return _ai.defineFlow(
@@ -63,12 +67,23 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    final researchResponse = await _runResearchPhase(question);
-    final toolCalls = extractToolCalls(researchResponse.messages);
-    final notes = buildResearchNotes(researchResponse);
+    final research = await _runResearchPhase(question);
+    final toolCalls = extractToolCalls(research.messages);
 
+    // No query ran, so nothing came from the database: answer with low
+    // confidence. That covers out-of-scope questions and an agent that ran
+    // out of turns before querying.
+    if (!toolCalls.any((call) => call.tool == 'runQuery')) {
+      return ResearchResult(
+        answer: research.text.isNotEmpty ? research.text : _outOfTurnsAnswer,
+        sources: const [],
+        confidence: 'low',
+        toolCalls: toolCalls,
+      );
+    }
+
+    final notes = buildResearchNotes(research);
     final synthesis = await _runSynthesisPhase(question, notes);
-
     return ResearchResult(
       answer: synthesis.answer,
       sources: synthesis.sources,
@@ -77,47 +92,22 @@ class ResearchAgent {
     );
   }
 
-  Future<GenerateResponseHelper> _runResearchPhase(String question) async {
-    try {
-      return await _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [TextPart(text: _researchPrompt)],
-          ),
-          Message(
-            role: Role.user,
-            content: [TextPart(text: question)],
-          ),
-        ],
-        tools: [_listTablesTool, _describeTableTool, _runQueryTool],
-        maxTurns: 10,
-      );
-    } on GenkitException catch (e) {
-      if (!e.message.contains('max turns')) rethrow;
-
-      return _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [
-              TextPart(
-                text:
-                    'You ran out of tool-calling turns. Summarize what you '
-                    'learned from the query results below. Do not call any '
-                    'more tools.',
-              ),
-            ],
-          ),
-          Message(
-            role: Role.user,
-            content: [TextPart(text: question)],
-          ),
-        ],
-      );
-    }
+  /// Runs the tool loop.
+  ///
+  /// When the loop reaches `maxTurns`, Genkit returns a result with
+  /// `finishReason: aborted` that keeps the messages so far, instead of
+  /// throwing. A cancel also ends as aborted, but this agent passes no
+  /// cancellation token, so here aborted always means the turn limit.
+  Future<GenerateResult> _runResearchPhase(String question) async {
+    final response = await _ai.generate(
+      model: _model,
+      system: _researchPrompt,
+      prompt: question,
+      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
+      maxTurns: _maxTurns,
+    );
+    _throwIfFailed(response);
+    return response;
   }
 
   Future<ResearchOutput> _runSynthesisPhase(
@@ -126,26 +116,38 @@ class ResearchAgent {
   ) async {
     final response = await _ai.generate(
       model: _model,
-      messages: [
-        Message(
-          role: Role.system,
-          content: [TextPart(text: _synthesisPrompt)],
-        ),
-        Message(
-          role: Role.user,
-          content: [
-            TextPart(text: 'Question: $question\n\nResearch notes:\n$notes'),
-          ],
-        ),
-      ],
+      system: _synthesisPrompt,
+      prompt: 'Question: $question\n\nResearch notes:\n$notes',
       outputSchema: ResearchOutput.$schema,
     );
+    _throwIfFailed(response);
 
-    return response.output ??
-        ResearchOutput(
-          answer: 'I was unable to produce a structured answer.',
-          sources: const [],
-          confidence: 'low',
-        );
+    // A reply that does not match the schema comes back as an error on the
+    // result instead of a throw. Fail here so the route answers 500.
+    final output = response.output;
+    if (output == null) {
+      throw GenkitException(
+        response.error?.message ?? 'The model returned no structured answer.',
+        cause: response.cause,
+      );
+    }
+    return output;
+  }
+
+  /// Throws when [response] reports a failed generation.
+  ///
+  /// Genkit 1.0 no longer throws when the model or a tool fails. It returns
+  /// a result with `finishReason: failed`, the thrown object as `cause` and
+  /// a structured `error`. Rethrowing keeps the route's error handling, which
+  /// maps a [GenkitException] status to an HTTP status.
+  static void _throwIfFailed(GenerateResult response) {
+    if (response.finishReason != FinishReason.failed) return;
+
+    final cause = response.cause;
+    if (cause is GenkitException) throw cause;
+    throw GenkitException(
+      response.error?.message ?? 'Generation failed.',
+      cause: cause,
+    );
   }
 }

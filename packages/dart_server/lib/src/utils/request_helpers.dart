@@ -4,11 +4,9 @@ import 'package:genkit/genkit.dart';
 import 'package:relic/relic.dart';
 
 Future<Map<String, dynamic>?> parseJsonBody(Request request) async {
-  // Relic ignores a Content-Type header it cannot parse and reads the body
-  // as UTF-8. Treat such a request as invalid instead.
-  final headers = request.headers;
-  if (headers.contains(HeaderName.contentType) &&
-      headers.tryGet(Headers.contentType) == null) {
+  // Reject a Content-Type that does not parse, as shelf did. Relic ignores it.
+  if (request.headers[Headers.contentType] != null &&
+      request.headers.tryGet(Headers.contentType) == null) {
     return null;
   }
 

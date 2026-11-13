@@ -43,7 +43,9 @@ class ResearchAgent {
       'question, "medium" if partially, "low" if the data was not found.\n'
       '- In the sources array, include the SQL queries from the notes '
       'that produced the key results (the SELECT statements).\n'
-      '- Write a clear, natural-language answer that interprets the data.';
+      '- Write a clear, natural-language answer that interprets the data.\n'
+      '- When listing items such as tracks, name each distinct item once and '
+      'give a count when it appears more than once.';
 
   final Genkit _ai;
   final ModelRef<GeminiOptions> _model;

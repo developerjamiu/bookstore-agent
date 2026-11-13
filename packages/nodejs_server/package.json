@@ -11,7 +11,7 @@
     "typecheck": "tsc -p . --noEmit"
   },
   "dependencies": {
-    "genkit": "^1.32.0"
+    "genkit": "^1.44.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

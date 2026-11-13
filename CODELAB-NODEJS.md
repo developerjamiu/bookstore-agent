@@ -349,7 +349,7 @@ const SYNTHESIS_PROMPT =
   'that produced the key results (the SELECT statements).\n' +
   '- Write a clear, natural-language answer that interprets the data.';
 
-const DEFAULT_MODEL = 'gemini-3.1-flash-lite-preview';
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 
 export class ResearchAgent {
   private readonly model;

@@ -6,15 +6,16 @@ import '../utils/request_helpers.dart';
 
 typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 
-class ResearchRoutes implements RouterInjectable {
+class ResearchRoutes {
   final ResearchFlow _researchFlow;
 
   ResearchRoutes({required ResearchFlow researchFlow})
     : _researchFlow = researchFlow;
 
-  @override
-  void injectIn(RelicRouter router) {
+  RelicRouter get router {
+    final router = RelicRouter();
     router.post('/api/research', _research);
+    return router;
   }
 
   Future<Response> _research(Request request) async {

@@ -17,7 +17,7 @@ export GEMINI_API_KEY=your-key-here
 npm start
 ```
 
-The server reads SQLite from `packages/dart_server/data/music_store.db`.
+The server reads SQLite from `packages/dart_server/data/bookstore.db`.
 
 ---
 
@@ -325,7 +325,7 @@ import { buildResearchNotes, extractToolCalls } from '../utils/messageHelpers.js
 
 const RESEARCH_PROMPT =
   'You are a database analyst agent. You can ONLY answer questions ' +
-  'by querying the music store database. Never use your own knowledge. ' +
+  'by querying the bookstore database. Never use your own knowledge. ' +
   'You do NOT know the database schema, so you must discover it using ' +
   'the tools provided:\n' +
   '- listTables: discover what tables exist\n' +
@@ -547,7 +547,7 @@ import { applyCors, handleCorsPreflight } from './middleware/cors.js';
 import { handleResearchPost } from './routes/research.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '..', '..', 'dart_server', 'data', 'music_store.db');
+const dbPath = path.resolve(__dirname, '..', '..', 'dart_server', 'data', 'bookstore.db');
 
 if (!existsSync(dbPath)) {
   console.error(`Database not found at ${dbPath}.`);
@@ -583,7 +583,7 @@ server.listen(port, host, () => {
   console.log('Try it:');
   console.log(`  curl -s http://localhost:${port}/api/research \\`);
   console.log('    -H "Content-Type: application/json" \\');
-  console.log('    -d \'{"question":"Which genre has the most tracks?"}\'');
+  console.log('    -d \'{"question":"Which genre has the most books?"}\'');
   console.log('');
 });
 

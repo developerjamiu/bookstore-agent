@@ -1,11 +1,11 @@
-# Music Store Agent — Build Your First AI Agent with Genkit
+# Bookstore Agent — Build Your First AI Agent with Genkit
 
 > **This `starter` branch** (typical **fork** clone) is the **codelab starting point**: Flutter + Dart server skeleton + **Node.js skeleton** under `packages/nodejs_server/` with placeholder APIs.  
 > **Full solution** (completed Dart + Node agents, server tests): [`developerjamiu/music-store-agent`](https://github.com/developerjamiu/music-store-agent) branch **`main`**.
 
 A hands-on codelab project where you build a **real AI agent** — an LLM that
 autonomously explores a database using tools it chooses, writes SQL queries,
-and answers natural-language questions about a music store.
+and answers natural-language questions about a bookstore.
 
 The agent doesn't just generate text. It **thinks, acts, observes, and
 decides** what to do next — the core loop that makes something an agent
@@ -30,7 +30,7 @@ rather than a chatbot.
 Ask a question like _"Who is the top spending customer?"_ and watch the agent:
 
 1. Call `listTables` to discover the database schema
-2. Call `describeTable` on `customers`, `invoices`, `invoice_lines`, `tracks`
+2. Call `describeTable` on `customers`, `orders`, `order_items`, `books`
 3. Write and run a SQL query to find the top spender
 4. Run a second query to find what they bought
 5. Synthesize a natural-language answer with the SQL sources
@@ -45,7 +45,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) **or** [Genkit JS](https://genkit.dev/docs/js/get-started/) (Node track) |
 | LLM          | Google Gemini — set `GOOGLE_API_KEY` or `GEMINI_API_KEY`    |
 | Server       | **Dart:** [Relic](https://docs.dartrelic.dev/) (`packages/dart_server`) **·** **Node:** `packages/nodejs_server` |
-| Database     | SQLite file `packages/dart_server/data/music_store.db` (Dart track & Node final wiring) |
+| Database     | SQLite file `packages/dart_server/data/bookstore.db` (Dart track & Node final wiring) |
 | Client       | Flutter (Material 3) — `POST /api/research` on port **8080** |
 
 **Codelabs:** [CODELAB.md](./CODELAB.md) (Dart) · [CODELAB-NODEJS.md](./CODELAB-NODEJS.md) (Node — reference code lives on upstream **`main`**).
@@ -74,7 +74,7 @@ music-store-agent/
 │   │           └── requestHelpers.ts    # jsonResponse, errorResponse, handleGenkitError (for later)
 │   ├── dart_server/
 │   │   ├── bin/server.dart              # Relic server entrypoint
-│   │   ├── data/music_store.db          # Pre-seeded SQLite database
+│   │   ├── data/bookstore.db            # Pre-seeded SQLite database
 │   │   ├── lib/src/
 │   │   │   ├── agent/
 │   │   │   │   ├── research_agent.dart  # Agent: tool loop + JSON answer
@@ -135,20 +135,20 @@ flutter pub get
 
 ### 2. Explore the database
 
-Open `packages/dart_server/data/music_store.db` in VS Code with the SQLite Viewer
+Open `packages/dart_server/data/bookstore.db` in VS Code with the SQLite Viewer
 extension. You'll see 9 tables with real data:
 
-| Table           | Rows | Description                                       |
-| --------------- | ---- | ------------------------------------------------- |
-| artists         | 15   | AC/DC, Queen, Miles Davis, Adele, etc.            |
-| albums          | 20   | Back in Black, Abbey Road, Kind of Blue, etc.     |
-| tracks          | 52   | Bohemian Rhapsody, Stairway to Heaven, etc.       |
-| genres          | 7    | Rock, Jazz, Metal, Pop, Reggae, Electronic, Blues |
-| customers       | 10   | International customers                           |
-| invoices        | 15   | Purchase records                                  |
-| invoice_lines   | 98   | Individual track purchases                        |
-| playlists       | 3    | Road Trip Rock, Chill Jazz, Party Anthems         |
-| playlist_tracks | 19   | Playlist memberships                              |
+| Table              | Rows | Description                                           |
+| ------------------ | ---- | ----------------------------------------------------- |
+| authors            | 15   | Jane Austen, Charles Dickens, Jules Verne, etc.       |
+| publishers         | 5    | Harbor Press, Northwind Books, etc.                   |
+| books              | 39   | Pride and Prejudice, Treasure Island, Longitude, etc. |
+| genres             | 7    | Classics, Mystery, Science Fiction, History, etc.     |
+| customers          | 10   | International customers                               |
+| orders             | 15   | Purchase records                                      |
+| order_items        | 29   | Individual book purchases                             |
+| reading_lists      | 3    | Summer Reading, Classic Mysteries, Book Club Picks    |
+| reading_list_books | 15   | Reading list memberships                              |
 
 ### 3. Run the tests (no API key needed)
 
@@ -200,7 +200,7 @@ Server running on http://localhost:8080
 # Simple lookup
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}'
+  -d '{"question":"What authors are in the database?"}'
 
 # Requires multi-table JOINs — watch the toolCalls array
 curl -s http://localhost:8080/api/research \
@@ -210,7 +210,7 @@ curl -s http://localhost:8080/api/research \
 # Many-to-many relationship
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What songs are in the Chill Jazz playlist?"}'
+  -d '{"question":"What books are on the Summer Reading list?"}'
 
 # Out of scope — agent should gracefully refuse
 curl -s http://localhost:8080/api/research \
@@ -267,7 +267,7 @@ it couldn't finish.
   `request_helpers.dart`, placeholder `POST /api/research`
 - **Node server scaffolding** — `packages/nodejs_server`: HTTP server, CORS,
   placeholder `POST /api/research` (see **Repository Structure**). No SQLite or Genkit flows yet.
-- **SQLite database** — `packages/dart_server/data/music_store.db` pre-seeded with all 9 tables
+- **SQLite database** — `packages/dart_server/data/bookstore.db` pre-seeded with all 9 tables
 - **Pubspec files** — all dependencies already configured
 - **Client tests** — unit, widget, and integration tests (all passing)
 

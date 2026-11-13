@@ -85,7 +85,7 @@ class _ResearchScreenState extends State<ResearchScreen> {
                     ),
                     const SizedBox(width: 10),
                     Text(
-                      'Music Store Agent',
+                      'Bookstore Agent',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -109,7 +109,7 @@ class _ResearchScreenState extends State<ResearchScreen> {
                   textInputAction: TextInputAction.search,
                   onSubmitted: (_) => _ask(),
                   decoration: InputDecoration(
-                    hintText: 'Which genre has the most tracks?',
+                    hintText: 'Which genre has the most books?',
                     filled: true,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),

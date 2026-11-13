@@ -41,7 +41,7 @@ The server uses [Relic](https://docs.dartrelic.dev/), a high-performance, type-s
 
 **Browse the database:**
 
-Optional: open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) extension. You'll see 9 tables: artists, albums, tracks, genres, customers, invoices, invoice_lines, playlists, and playlist_tracks.
+Optional: open `packages/dart_server/data/bookstore.db` in VS Code with the [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) extension. You'll see 9 tables: authors, publishers, books, genres, customers, orders, order_items, reading_lists, and reading_list_books.
 
 **Run the starter server:**
 
@@ -56,14 +56,14 @@ It listens on port 8080, where the Flutter app expects it. Leave it running and 
 ```sh
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}'
+  -d '{"question":"What authors are in the database?"}'
 ```
 
 You'll see this JSON (formatted here for easier reading):
 
 ```json
 {
-  "answer": "This is a placeholder. Complete the codelab to power this with a real AI agent that explores the music store database!",
+  "answer": "This is a placeholder. Complete the codelab to power this with a real AI agent that explores the bookstore database!",
   "sources": [],
   "confidence": "low",
   "toolCalls": []
@@ -95,11 +95,11 @@ To do this, it uses three tools. A tool is a Dart function plus a name, a descri
 
 The agent decides which tool to call, in what order, and when to stop. For this question, a typical run looks like this:
 
-1. Agent calls `listTables`: sees `customers`, `invoices`, `invoice_lines`, `tracks` and more
+1. Agent calls `listTables`: sees `customers`, `orders`, `order_items`, `books` and more
 2. Agent calls `describeTable("customers")`: learns the column names and types
-3. Agent calls `describeTable("invoices")`: sees the `CustomerId` foreign key, so it knows how to join
-4. Agent calls `describeTable("invoice_lines")`: sees how individual purchases connect
-5. Agent calls `describeTable("tracks")`: finds where the track names live
+3. Agent calls `describeTable("orders")`: sees the `CustomerId` foreign key, so it knows how to join
+4. Agent calls `describeTable("order_items")`: sees how individual purchases connect
+5. Agent calls `describeTable("books")`: finds where the book titles live
 6. Agent calls `runQuery("SELECT ... JOIN ... GROUP BY ... ORDER BY ... LIMIT 1")`: finds the top spender
 7. Agent calls `runQuery("SELECT ... WHERE CustomerId = ...")`: finds what they bought
 8. Agent decides it has enough and stops
@@ -296,9 +296,9 @@ class ListTablesTool {
   ///
   /// ```
   /// Tables in the database:
-  /// - albums
-  /// - artists
-  /// - tracks
+  /// - authors
+  /// - books
+  /// - customers
   /// ```
   Future<String> list() async {
     final result = _db.select(
@@ -354,12 +354,12 @@ class DescribeTableTool {
   /// Returns column info and foreign keys, or a not-found message.
   ///
   /// ```
-  /// Columns in "tracks":
-  /// - TrackId INTEGER NOT NULL PRIMARY KEY
-  /// - Name TEXT NOT NULL
-  /// - AlbumId INTEGER
+  /// Columns in "books":
+  /// - BookId INTEGER PRIMARY KEY
+  /// - Title TEXT NOT NULL
+  /// - AuthorId INTEGER NOT NULL
   /// Foreign keys:
-  /// - AlbumId -> albums(AlbumId)
+  /// - AuthorId -> authors(AuthorId)
   /// ```
   Future<String> describe(TableNameInput input) async {
     final tableName = input.table;
@@ -438,7 +438,7 @@ class RunQueryTool {
   /// Executes the query and returns JSON rows, or an error message.
   ///
   /// ```
-  /// [{"Name":"AC/DC"},{"Name":"Led Zeppelin"},{"Name":"Queen"}]
+  /// [{"Name":"Jane Austen"},{"Name":"Charles Dickens"},{"Name":"Mark Twain"}]
   /// ```
   Future<String> query(SqlQueryInput input) async {
     final sql = input.sql.trim();
@@ -492,8 +492,8 @@ import '../schemas/tool_call.dart';
 ///
 /// ```
 /// [ToolCall(tool: "listTables", input: "{}"),
-///  ToolCall(tool: "describeTable", input: "{\"table\":\"artists\"}"),
-///  ToolCall(tool: "runQuery", input: "{\"sql\":\"SELECT Name FROM artists\"}")]
+///  ToolCall(tool: "describeTable", input: "{\"table\":\"authors\"}"),
+///  ToolCall(tool: "runQuery", input: "{\"sql\":\"SELECT Name FROM authors\"}")]
 /// ```
 List<ToolCall> extractToolCalls(List<Message> messages) {
   final calls = <ToolCall>[];
@@ -545,7 +545,7 @@ typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 class ResearchAgent {
   static const _prompt =
       'You are a database analyst. Answer questions ONLY from the results of '
-      'queries you run on the music store database, never from your own '
+      'queries you run on the bookstore database, never from your own '
       'knowledge.\n\n'
       'You do not know the database schema. To answer:\n'
       '1. Use listTables to see what tables exist.\n'
@@ -557,11 +557,12 @@ class ResearchAgent {
       'tools and reply.\n\n'
       'In your reply:\n'
       '- answer: interpret the query results clearly. When listing items such '
-      'as tracks, name each distinct item once and give a count when it '
+      'as books, name each distinct item once and give a count when it '
       'appears more than once.\n'
       '- sources: the SELECT statements that produced the key results.\n'
-      '- confidence: "high" if the results clearly answer the question, '
-      '"medium" if partially, "low" if the database cannot answer it.';
+      '- confidence: "low" if the database cannot answer the question, even '
+      'if you ran queries. Otherwise "high" if the results clearly answer it, '
+      'or "medium" if they answer it partially.';
 
   static const _maxTurns = 10;
 
@@ -746,7 +747,7 @@ import 'package:dart_server/src/middleware/cors.dart';
 import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
-  final dbPath = Platform.script.resolve('../data/music_store.db').toFilePath();
+  final dbPath = Platform.script.resolve('../data/bookstore.db').toFilePath();
   if (!File(dbPath).existsSync()) {
     stderr.writeln('Database not found at $dbPath.');
     exit(1);
@@ -789,10 +790,10 @@ How it works:
    ```sh
    curl -s http://localhost:8080/api/research \
      -H 'Content-Type: application/json' \
-     -d '{"question":"Which genre has the most tracks?"}'
+     -d '{"question":"Which genre has the most books?"}'
    ```
 
-   You should get JSON with an `answer` that names Rock (31 tracks), the SQL behind it in `sources`, and the tools the agent called in `toolCalls`. The wording changes from run to run.
+   You should get JSON with an `answer` that names Classics (12 books), the SQL behind it in `sources`, and the tools the agent called in `toolCalls`. The wording changes from run to run.
 
 4. Ask the same question in the Flutter app from Step 0. If you closed it, run `flutter run` in `packages/client` again. You get the agent's answer instead of the placeholder.
 
@@ -820,9 +821,9 @@ You now have a working agent that answers from real query results.
 
 Ask these questions in the Flutter app. For each one, look at the answer, its confidence badge, **Queries used**, and the **Agent trace**.
 
-- **"What artists are in the database?"** A simple lookup on one table.
-- **"Who is the top spending customer and what did they buy?"** The agent joins customers, invoices, invoice lines and tracks.
-- **"What songs are in the Chill Jazz playlist?"** The agent goes through `playlist_tracks`, the table that links playlists to tracks.
+- **"What authors are in the database?"** A simple lookup on one table.
+- **"Who is the top spending customer and what did they buy?"** The agent joins customers, orders, order items and books.
+- **"What books are on the Summer Reading list?"** The agent goes through `reading_list_books`, the table that links reading lists to books.
 - **"What is the weather today?"** The database can't answer this, so the agent says so with low confidence.
 
 ### What's Next
@@ -830,4 +831,4 @@ Ask these questions in the Flutter app. For each one, look at the answer, its co
 - **Add more tools**: a `sampleRows` tool that returns a few rows from any table
 - **Add tests**: use `ai.defineModel()` to create fake models that simulate the tool-calling loop without API calls (see the `main` branch for examples)
 - **Add streaming**: stream tool activity to the UI in real time with server-sent events (SSE)
-- **Try a different database**: swap `music_store.db` for your own data
+- **Try a different database**: swap `bookstore.db` for your own data

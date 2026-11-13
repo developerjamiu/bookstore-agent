@@ -233,9 +233,12 @@ void main() {
 
     group('with the research agent and a fake model', () {
       /// The research agent's flow, on a fake model that answers with [fn].
+      /// Every tool answers `[]`, except that runQuery runs [runQuery] when
+      /// given.
       ResearchFlow agentFlow(
-        Future<ModelResponse> Function(ModelRequest request) fn,
-      ) {
+        Future<ModelResponse> Function(ModelRequest request) fn, {
+        Future<String> Function()? runQuery,
+      }) {
         ai.defineModel(name: 'fake/model', fn: (request, _) => fn(request));
         Tool<I, String> tool<I>(String name, SchemanticType<I> input) =>
             ai.defineTool(
@@ -243,7 +246,11 @@ void main() {
               description: name,
               inputSchema: input,
               outputSchema: SchemanticType.string(),
-              fn: (_, _) async => .response('[]'),
+              fn: (_, _) async => .response(
+                name == 'runQuery' && runQuery != null
+                    ? await runQuery()
+                    : '[]',
+              ),
             );
         return ResearchAgent(
           ai: ai,
@@ -300,6 +307,68 @@ void main() {
           429,
           'API quota exceeded. Please try again later.',
         );
+      });
+
+      test(
+        'answers 429 when only the research phase exhausts the quota',
+        () async {
+          final response = await send(
+            Method.post,
+            body: _json({'question': 'How many artists are there?'}),
+            flow: agentFlow((request) async {
+              if (request.output != null) {
+                return text(
+                  '{"answer": "x", "sources": [], "confidence": "low"}',
+                );
+              }
+              throw GenkitException(
+                'Quota exceeded for this model.',
+                status: StatusCode.resourceExhausted,
+              );
+            }),
+          );
+
+          await expectJsonError(
+            response,
+            429,
+            'API quota exceeded. Please try again later.',
+          );
+          expect(printed.single, contains('Quota exceeded'));
+        },
+      );
+
+      test('answers 500 when a tool fails during research', () async {
+        final response = await send(
+          Method.post,
+          body: _json({'question': 'How many artists are there?'}),
+          flow: agentFlow(
+            (request) async => request.output != null
+                ? text('{"answer": "x", "sources": [], "confidence": "low"}')
+                : ModelResponse(
+                    finishReason: FinishReason.stop,
+                    message: Message(
+                      role: Role.model,
+                      content: [
+                        ToolRequestPart(
+                          toolRequest: ToolRequest(
+                            name: 'runQuery',
+                            input: const {'sql': 'SELECT 1'},
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+            runQuery: () async => throw StateError('database is locked'),
+          ),
+        );
+
+        await expectJsonError(
+          response,
+          500,
+          'Agent failed. Check server logs for details.',
+        );
+        expect(printed.single, startsWith('Genkit error: '));
+        expect(printed.single, contains('tool "runQuery" failed'));
       });
 
       test('answers 500 when the synthesis reply does not parse', () async {

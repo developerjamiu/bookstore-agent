@@ -11,8 +11,13 @@ void main() {
   late Genkit ai;
   late ResearchAgent agent;
 
-  /// Builds an agent that talks to the fake model named [model].
-  late ResearchAgent Function(String model) agentFor;
+  /// Builds an agent that talks to the fake model named [model], with
+  /// [runQueryTool] in place of the fake runQuery tool when given.
+  late ResearchAgent Function(
+    String model, {
+    Tool<SqlQueryInput, String>? runQueryTool,
+  })
+  agentFor;
 
   setUp(() {
     ai = Genkit();
@@ -49,7 +54,7 @@ void main() {
       ),
     );
 
-    final runQueryTool = ai.defineTool(
+    final defaultRunQueryTool = ai.defineTool(
       name: 'runQuery',
       description: 'Run a SQL query.',
       inputSchema: SqlQueryInput.$schema,
@@ -63,13 +68,14 @@ void main() {
       ),
     );
 
-    agentFor = (model) => ResearchAgent(
-      ai: ai,
-      model: modelRef(model),
-      listTablesTool: listTablesTool,
-      describeTableTool: describeTableTool,
-      runQueryTool: runQueryTool,
-    );
+    agentFor = (model, {Tool<SqlQueryInput, String>? runQueryTool}) =>
+        ResearchAgent(
+          ai: ai,
+          model: modelRef(model),
+          listTablesTool: listTablesTool,
+          describeTableTool: describeTableTool,
+          runQueryTool: runQueryTool ?? defaultRunQueryTool,
+        );
     agent = agentFor('fake/model');
   });
 
@@ -230,6 +236,76 @@ void main() {
         );
       },
     );
+
+    test('throws when only the research phase fails', () async {
+      // Synthesis would succeed, so only the research-phase check can turn
+      // this failure into an error instead of an answer.
+      ai.defineModel(
+        name: 'fake/research-quota',
+        fn: (request, _) async {
+          if (request.output != null) return _structuredResponse(request);
+          throw GenkitException(
+            'Quota exceeded for this model.',
+            status: StatusCode.resourceExhausted,
+          );
+        },
+      );
+
+      await expectLater(
+        agentFor('fake/research-quota').research('How many artists?'),
+        throwsA(
+          isA<GenkitException>()
+              .having((e) => e.status, 'status', StatusCode.resourceExhausted)
+              .having((e) => e.message, 'message', contains('Quota exceeded')),
+        ),
+      );
+    });
+
+    test('throws when a tool fails during research', () async {
+      final failingRunQuery = ai.defineTool(
+        name: 'failingRunQuery',
+        description: 'Run a SQL query.',
+        inputSchema: SqlQueryInput.$schema,
+        outputSchema: SchemanticType.string(),
+        fn: (_, _) async => throw StateError('database is locked'),
+      );
+      ai.defineModel(
+        name: 'fake/query-first',
+        fn: (request, _) async {
+          if (request.output != null) return _structuredResponse(request);
+          return ModelResponse(
+            finishReason: FinishReason.stop,
+            message: Message(
+              role: Role.model,
+              content: [
+                ToolRequestPart(
+                  toolRequest: ToolRequest(
+                    name: 'failingRunQuery',
+                    input: const {'sql': 'SELECT Name FROM artists'},
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      await expectLater(
+        agentFor(
+          'fake/query-first',
+          runQueryTool: failingRunQuery,
+        ).research('How many artists?'),
+        throwsA(
+          isA<GenkitException>()
+              .having((e) => e.status, 'status', StatusCode.internal)
+              .having(
+                (e) => e.message,
+                'message',
+                contains('tool "failingRunQuery" failed'),
+              )
+              .having((e) => e.message, 'message', contains('database is')),
+        ),
+      );
+    });
 
     test('throws when the synthesis reply is not JSON', () async {
       ai.defineModel(

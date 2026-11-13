@@ -109,32 +109,21 @@ The model (Gemini) chooses every step. Your code only provides the tools.
 
 After the loop, a second model call turns the query results into a structured answer with the text, the SQL behind it and a confidence level. If no query ran, for example for a weather question, the agent skips that call and replies with low confidence.
 
-What you'll build:
+What happens when the app sends a question:
 
+```mermaid
+flowchart TD
+    Q["Flutter app sends a question"] --> R["routes/research.dart<br/>POST /api/research"]
+    R --> P1["research_agent.dart<br/>Phase 1: tool loop, up to 10 turns"]
+    P1 <--> T["Tools<br/>listTables, describeTable, runQuery"]
+    P1 --> D{"Did runQuery run?"}
+    D -- No --> L["Reply directly<br/>with low confidence"]
+    D -- Yes --> P2["Phase 2: synthesis<br/>outputSchema: ResearchOutput"]
+    L --> A["JSON back to the app<br/>answer, sources, confidence, tool trace"]
+    P2 --> A
 ```
-User question
-    |
-bin/server.dart (opens DB, creates Genkit, starts Relic)
-    |
-routes/research.dart (receives POST, calls the agent flow)
-    |
-agent/setup.dart (built once at startup: wires tools + agent into the flow)
-    |
-agent/research_agent.dart
-    |-- Phase 1: tool-calling loop (maxTurns: 10)
-    |   |-- listTables
-    |   |-- describeTable
-    |   |-- runQuery
-    |   (model picks which tool, sees result, picks again)
-    |
-    |-- No query ran? Reply directly, with low confidence
-    |
-    |-- Phase 2: synthesis (outputSchema: ResearchOutput)
-    |   (structured JSON from the research notes)
-    |
-    v
-Flutter UI (renders answer + SQL sources + agent trace)
-```
+
+Before any question arrives, `bin/server.dart` starts the server. It opens the database, creates Genkit and uses `agent/setup.dart` to build the tools and the agent once.
 
 You'll build it bottom-up: schemas, tools, message helpers, the agent, then the wiring.
 

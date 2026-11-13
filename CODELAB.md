@@ -731,7 +731,7 @@ How it works:
 
 ## Step 7: Update the Server Entrypoint
 
-Last, the entrypoint builds the real objects once, at startup, and hands the flow to the route. Replace `packages/dart_server/bin/server.dart` with:
+Replace `packages/dart_server/bin/server.dart` with:
 
 ```dart
 import 'dart:io';
@@ -756,7 +756,7 @@ Future<void> main() async {
   final researchFlow = createResearchFlow(ai: ai, db: sqlite3.open(dbPath));
   final routes = ResearchRoutes(researchFlow: researchFlow);
 
-  // Mounted for every path so cors() also reaches preflights and 404/405s.
+  // Every path goes to the router, so the middleware runs on every request.
   final app = RelicApp()
     ..use('/', cors())
     ..use('/', logRequests())
@@ -769,26 +769,34 @@ Future<void> main() async {
 }
 ```
 
-Everything above the `RelicApp` setup is new. It checks that the database file exists, creates Genkit with the Google AI plugin, opens the database, builds the research flow you wired in Step 5 and passes it to `ResearchRoutes`. `googleAI()` reads your key from `GOOGLE_API_KEY`.
+How it works:
 
-The `RelicApp` part is the server itself. `use` adds middleware that runs on every request, here CORS and request logging. `any('/**', ...)` sends every path to your router, and `serve` starts listening on the port.
+- **New at the top of `main`:** the server checks that the database file exists, creates Genkit with the Google AI plugin, opens the database, and passes the flow from `createResearchFlow` (Step 5) to `ResearchRoutes`. `googleAI()` reads your key from the `GOOGLE_API_KEY` environment variable.
+- **The Relic server, unchanged from the starter:** `use` adds middleware, here CORS and request logging. `any('/**', ...)` sends every path to your router, so the middleware runs on every request. `serve` starts listening on port 8080, or on `PORT` if you set it.
 
-**Test it live** from the repository root. First stop the starter server from Step 0 (Ctrl+C in its terminal), because it still holds port 8080. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..`.
+### Test it
 
-```sh
-export GOOGLE_API_KEY=your-key-here
-dart run packages/dart_server/bin/server.dart
-```
+1. Stop the starter server from Step 0 with Ctrl+C in its terminal. It uses port 8080.
+2. In the repository root (the `music-store-agent` folder), set your key and start the server:
 
-```sh
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"Which genre has the most tracks?"}'
-```
+   ```sh
+   export GOOGLE_API_KEY=your-key-here
+   dart run packages/dart_server/bin/server.dart
+   ```
 
-You should see an answer naming Rock (31 tracks), the SQL behind it in `sources`, and `toolCalls` showing the agent's exploration sequence. The wording varies by run. Open the Flutter app and try it there too: the placeholder is gone.
+3. In a second terminal, ask a question:
 
-If curl prints `Agent failed. Check server logs for details.` and the server log says `apiKey must be set to an API key`, the server can't see your key. Export it in the server's terminal and restart.
+   ```sh
+   curl -s http://localhost:8080/api/research \
+     -H 'Content-Type: application/json' \
+     -d '{"question":"Which genre has the most tracks?"}'
+   ```
+
+   You should get JSON with an `answer` that names Rock (31 tracks), the SQL behind it in `sources`, and the tools the agent called in `toolCalls`. The wording changes from run to run.
+
+4. Ask the same question in the Flutter app. You get the agent's answer instead of the placeholder.
+
+If curl prints `{"error":"Agent failed. Check server logs for details."}` and the server log shows `apiKey must be set to an API key`, the server can't see your key. Run the `export` line in the server's terminal, then restart the server.
 
 ---
 

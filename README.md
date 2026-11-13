@@ -48,7 +48,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 | Database     | SQLite file `packages/server/data/music_store.db` (Dart track & Node final wiring) |
 | Client       | Flutter (Material 3) — `POST /api/research` on port **8080** |
 
-**Codelabs:** [CODELAB.md](./CODELAB.md) (Dart) · [CODELAB-NodeJS.md](./CODELAB-NodeJS.md) (Node — reference code lives on upstream **`main`**).
+**Codelabs:** [CODELAB.md](./CODELAB.md) (Dart) · [CODELAB-NODEJS.md](./CODELAB-NODEJS.md) (Node — reference code lives on upstream **`main`**).
 
 ## Repository Structure
 
@@ -57,7 +57,7 @@ research_assistant/
 ├── pubspec.yaml                         # Dart workspace root
 ├── README.md
 ├── CODELAB.md
-├── CODELAB-NodeJS.md
+├── CODELAB-NODEJS.md
 │
 ├── packages/
 │   ├── nodejs_server/

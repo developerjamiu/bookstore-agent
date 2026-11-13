@@ -259,7 +259,7 @@ dart run build_runner build
 
 Create the three tools below. Each is a class with three parts:
 
-- a constructor that receives `ai` and `db` (dependency injection), so tests can pass their own;
+- a constructor that receives `ai` and `db`;
 - `call()`, which registers the tool with Genkit;
 - a plain method (`list`, `describe`, `query`) that holds the logic, which tests call directly.
 
@@ -786,7 +786,7 @@ class ResearchAgent {
 
 ## Step 5: Wire Everything in the Composition Root
 
-`AISetup` is the composition root: the one place that builds the tools and the agent from Genkit and the database.
+Each class you wrote gets what it needs (`ai`, `db`, the tools) through its constructor instead of creating it. This is dependency injection. `AISetup` is the one place that creates those objects and passes them in, which is called the composition root.
 
 Create `packages/dart_server/lib/src/agent/setup.dart`:
 

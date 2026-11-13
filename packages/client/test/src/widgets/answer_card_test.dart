@@ -12,7 +12,7 @@ void main() {
         wrap(
           AnswerCard(
             result: ResearchResult(
-              answer: 'Rock has the most tracks.',
+              answer: 'Classics has the most books.',
               sources: const [],
               confidence: 'high',
               toolCalls: const [],
@@ -21,7 +21,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Rock has the most tracks.'), findsOneWidget);
+      expect(find.text('Classics has the most books.'), findsOneWidget);
       expect(find.text('High confidence'), findsOneWidget);
       expect(find.text('Queries used'), findsNothing);
     });
@@ -32,7 +32,7 @@ void main() {
           AnswerCard(
             result: ResearchResult(
               answer: 'Answer.',
-              sources: const ['SELECT Name FROM artists'],
+              sources: const ['SELECT Name FROM authors'],
               confidence: 'medium',
               toolCalls: const [],
             ),
@@ -41,7 +41,7 @@ void main() {
       );
 
       expect(find.text('Queries used'), findsOneWidget);
-      expect(find.text('SELECT Name FROM artists'), findsOneWidget);
+      expect(find.text('SELECT Name FROM authors'), findsOneWidget);
       expect(find.text('Medium confidence'), findsOneWidget);
     });
 

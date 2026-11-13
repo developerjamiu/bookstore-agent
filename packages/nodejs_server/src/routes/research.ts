@@ -41,7 +41,7 @@ export async function handleResearchPost(
 
   jsonResponse(res, {
     answer:
-      'This is a placeholder. Complete the codelab to power this with a real AI agent that explores the music store database!',
+      'This is a placeholder. Complete the codelab to power this with a real AI agent that explores the bookstore database!',
     sources: [],
     confidence: 'low',
     toolCalls: [],

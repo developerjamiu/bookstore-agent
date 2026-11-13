@@ -2,7 +2,7 @@
   "name": "research-assistant-server-js",
   "version": "0.1.0",
   "private": true,
-  "description": "Music store research agent — starter shell (placeholder API only)",
+  "description": "Bookstore research agent — starter shell (placeholder API only)",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

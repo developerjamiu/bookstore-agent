@@ -22,7 +22,7 @@ class ResearchRoutes {
     return jsonResponse({
       'answer':
           'This is a placeholder. Complete the codelab to power this '
-          'with a real AI agent that explores the music store database!',
+          'with a real AI agent that explores the bookstore database!',
       'sources': <String>[],
       'confidence': 'low',
       'toolCalls': <Map<String, String>>[],

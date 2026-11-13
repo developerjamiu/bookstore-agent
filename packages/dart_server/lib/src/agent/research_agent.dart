@@ -8,6 +8,9 @@ import '../schemas/sql_query_input.dart';
 import '../schemas/table_name_input.dart';
 import '../utils/message_helpers.dart';
 
+/// A Genkit flow that takes a question and returns a [ResearchResult].
+typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
+
 class ResearchAgent {
   static const _prompt =
       'You are a database analyst. Answer questions ONLY from the results of '
@@ -49,7 +52,7 @@ class ResearchAgent {
     required this._runQueryTool,
   }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
-  Flow<String, ResearchResult, Never, Never> define() {
+  ResearchFlow define() {
     return _ai.defineFlow(
       name: 'researchFlow',
       inputSchema: SchemanticType.string(),

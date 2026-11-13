@@ -1,21 +1,15 @@
 import 'package:genkit/genkit.dart';
 import 'package:relic/relic.dart';
 
-import '../schemas/research_result.dart';
+import '../agent/research_agent.dart';
 import '../utils/request_helpers.dart';
-
-typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 
 class ResearchRoutes {
   final ResearchFlow _researchFlow;
 
   ResearchRoutes({required this._researchFlow});
 
-  RelicRouter get router {
-    final router = RelicRouter();
-    router.post('/api/research', _research);
-    return router;
-  }
+  RelicRouter get router => RelicRouter()..post('/api/research', _research);
 
   Future<Response> _research(Request request) async {
     final body = await parseJsonBody(request);

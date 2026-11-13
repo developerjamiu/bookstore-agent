@@ -145,7 +145,7 @@ Each component has a clear role, and you'll build them bottom-up: schemas first,
 
 First, define the shape of the data your tools take and your agent returns. Genkit sends the tool input schemas and `ResearchOutput` to the model, so their `description` strings are instructions, not comments.
 
-We use [Schemantic](https://pub.dev/packages/schemantic), a code generator: you write an abstract `$TableNameInput`, and it generates the `TableNameInput` class, with `fromJson`, `toJson` and the `$schema` Genkit reads, into the `part` file. Schemas refer to each other by `$` name: `List<$ToolCall>`.
+We use [Schemantic](https://pub.dev/packages/schemantic), a code generator. You write an abstract class like `$TableNameInput`, and Schemantic generates the real `TableNameInput` class in the `part` file, with `fromJson`, `toJson` and the `$schema` that Genkit reads. When one schema uses another, refer to it by its `$` name, like `List<$ToolCall>`.
 
 ### Tool input schemas
 

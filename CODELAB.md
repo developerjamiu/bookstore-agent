@@ -27,8 +27,8 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 ## Step 0: Get the Starter Project
 
 ```sh
-git clone https://github.com/developerjamiu/music-store-agent.git
-cd music-store-agent
+git clone https://github.com/developerjamiu/bookstore-agent.git
+cd bookstore-agent
 git checkout starter
 flutter pub get
 ```
@@ -778,7 +778,7 @@ How it works:
 ### Test it
 
 1. Stop the starter server from Step 0 with Ctrl+C in its terminal. It uses port 8080.
-2. In the repository root (the `music-store-agent` folder), set your key and start the server:
+2. In the repository root (the `bookstore-agent` folder), set your key and start the server:
 
    ```sh
    export GOOGLE_API_KEY=your-key-here

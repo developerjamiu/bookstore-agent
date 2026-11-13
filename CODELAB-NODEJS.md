@@ -1,6 +1,6 @@
 # Build Your First AI Agent with Genkit — Node.js Track
 
-This guide documents the **complete** Node implementation (same files as on [`developerjamiu/music-store-agent`](https://github.com/developerjamiu/music-store-agent) branch **`main`**). On **this `starter` fork**, you build those files from scratch on top of the placeholder shell in `packages/nodejs_server/`, or read along with the reference repo.
+This guide documents the **complete** Node implementation (same files as on [`developerjamiu/bookstore-agent`](https://github.com/developerjamiu/bookstore-agent) branch **`main`**). On **this `starter` fork**, you build those files from scratch on top of the placeholder shell in `packages/nodejs_server/`, or read along with the reference repo.
 
 **Prerequisites:** Node.js 20+, `GEMINI_API_KEY` or `GOOGLE_API_KEY` in the environment (never commit keys).
 

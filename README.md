@@ -1,7 +1,7 @@
 # Bookstore Agent — Build Your First AI Agent with Genkit
 
 > **This `starter` branch** (typical **fork** clone) is the **codelab starting point**: Flutter + Dart server skeleton + **Node.js skeleton** under `packages/nodejs_server/` with placeholder APIs.  
-> **Full solution** (completed Dart + Node agents, server tests): [`developerjamiu/music-store-agent`](https://github.com/developerjamiu/music-store-agent) branch **`main`**.
+> **Full solution** (completed Dart + Node agents, server tests): [`developerjamiu/bookstore-agent`](https://github.com/developerjamiu/bookstore-agent) branch **`main`**.
 
 A hands-on codelab project where you build a **real AI agent** — an LLM that
 autonomously explores a database using tools it chooses, writes SQL queries,
@@ -53,7 +53,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 ## Repository Structure
 
 ```
-music-store-agent/
+bookstore-agent/
 ├── pubspec.yaml                         # Dart workspace root
 ├── README.md
 ├── CODELAB.md
@@ -128,8 +128,8 @@ music-store-agent/
 ### 1. Clone and install dependencies
 
 ```sh
-git clone https://github.com/developerjamiu/music-store-agent.git
-cd music-store-agent
+git clone https://github.com/developerjamiu/bookstore-agent.git
+cd bookstore-agent
 flutter pub get
 ```
 
@@ -179,7 +179,7 @@ listen on another port, set `PORT` (the Node server reads it too), for example
 `PORT=8081 dart run packages/dart_server/bin/server.dart`. The client still
 calls 8080, so use another port only for curl testing.
 
-**Full agent + tests** — clone upstream **`main`**: [music-store-agent](https://github.com/developerjamiu/music-store-agent).
+**Full agent + tests** — clone upstream **`main`**: [bookstore-agent](https://github.com/developerjamiu/bookstore-agent).
 
 ### 4b. Dart server with API key (after you complete the Dart codelab)
 

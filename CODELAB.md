@@ -261,7 +261,7 @@ Create the three tools below. Each is a class with three parts:
 
 - A constructor that receives `ai` and `db`
 - `call()`, which registers the tool with Genkit
-- A plain method (`list`, `describe`, `query`) that holds the logic, which tests call directly
+- A plain method (`list`, `describe`, `query`) that holds the logic
 
 ### ListTablesTool
 

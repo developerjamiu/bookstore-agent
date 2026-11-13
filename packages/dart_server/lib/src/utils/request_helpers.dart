@@ -1,9 +1,15 @@
 import 'dart:convert';
 
 import 'package:genkit/genkit.dart';
-import 'package:shelf/shelf.dart';
+import 'package:relic/relic.dart';
 
 Future<Map<String, dynamic>?> parseJsonBody(Request request) async {
+  // Reject a Content-Type that does not parse, as shelf did. Relic ignores it.
+  if (request.headers[Headers.contentType] != null &&
+      request.headers.tryGet(Headers.contentType) == null) {
+    return null;
+  }
+
   try {
     final text = await request.readAsString();
     if (text.isEmpty) return null;
@@ -18,8 +24,7 @@ Future<Map<String, dynamic>?> parseJsonBody(Request request) async {
 Response jsonResponse(Object? body, {int statusCode = 200}) {
   return Response(
     statusCode,
-    body: jsonEncode(body),
-    headers: {'Content-Type': 'application/json'},
+    body: Body.fromString(jsonEncode(body), mimeType: MimeType.json),
   );
 }
 

@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:genkit/genkit.dart';
 import 'package:schemantic/schemantic.dart';
-import 'package:server/src/agent/research_agent.dart';
-import 'package:server/src/schemas/sql_query_input.dart';
-import 'package:server/src/schemas/table_name_input.dart';
+import 'package:dart_server/src/agent/research_agent.dart';
+import 'package:dart_server/src/schemas/sql_query_input.dart';
+import 'package:dart_server/src/schemas/table_name_input.dart';
 import 'package:test/test.dart';
 
 void main() {

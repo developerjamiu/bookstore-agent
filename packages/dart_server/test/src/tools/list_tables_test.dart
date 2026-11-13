@@ -1,6 +1,6 @@
 import 'package:genkit/genkit.dart';
 import '../helpers/test_database.dart';
-import 'package:server/src/tools/list_tables.dart';
+import 'package:dart_server/src/tools/list_tables.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 

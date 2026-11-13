@@ -1,6 +1,5 @@
 import 'package:genkit/genkit.dart';
-import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
+import 'package:relic/relic.dart';
 
 import '../schemas/research_result.dart';
 import '../utils/request_helpers.dart';
@@ -13,8 +12,8 @@ class ResearchRoutes {
   ResearchRoutes({required ResearchFlow researchFlow})
     : _researchFlow = researchFlow;
 
-  Router get router {
-    final router = Router();
+  RelicRouter get router {
+    final router = RelicRouter();
     router.post('/api/research', _research);
     return router;
   }

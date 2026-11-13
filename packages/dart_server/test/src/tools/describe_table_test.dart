@@ -1,7 +1,7 @@
 import 'package:genkit/genkit.dart';
 import '../helpers/test_database.dart';
-import 'package:server/src/schemas/table_name_input.dart';
-import 'package:server/src/tools/describe_table.dart';
+import 'package:dart_server/src/schemas/table_name_input.dart';
+import 'package:dart_server/src/tools/describe_table.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:test/test.dart';
 

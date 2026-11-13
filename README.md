@@ -12,7 +12,7 @@ rather than a chatbot.
 
 ```
 ┌──────────────┐    POST /api/research     ┌──────────────────────┐
-│  Flutter UI  │ ────────────────────────►  │  Shelf Server :8080  │
+│  Flutter UI  │ ────────────────────────►  │  Relic Server :8080  │
 │              │                           │                      │
 │  - question  │    { answer, sources,     │  ┌────────────────┐  │
 │  - answer    │ ◄── confidence,           │  │ ResearchAgent  │  │
@@ -41,7 +41,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 | ------------ | ----------------------------------------------------------- |
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) |
 | LLM          | Google Gemini (via `genkit_google_genai`)                   |
-| Server       | Shelf (Dart) or Node.js HTTP server (`packages/server` · `packages/nodejs_server`) |
+| Server       | [Relic](https://docs.dartrelic.dev/) (Dart) or Node.js HTTP server (`packages/dart_server` · `packages/nodejs_server`) |
 | Database     | SQLite (in-process, no server needed)                       |
 | Schemas      | Schemantic (code-generated JSON schemas)                    |
 | Client       | Flutter (Material 3)                                        |
@@ -80,8 +80,8 @@ research_assistant/
 │   │           ├── researchAgent.ts      # Two-phase agent: tool loop + structured synthesis
 │   │           └── setup.ts             # Composition root: Genkit + tools + flow
 │   │
-│   ├── server/
-│   │   ├── bin/server.dart              # Shelf server entrypoint
+│   ├── dart_server/
+│   │   ├── bin/server.dart              # Relic server entrypoint
 │   │   ├── data/music_store.db          # Pre-seeded SQLite database
 │   │   ├── lib/src/
 │   │   │   ├── agent/
@@ -102,7 +102,9 @@ research_assistant/
 │   │           ├── agent/               # Agent tests (fake model)
 │   │           ├── tools/               # Tool unit tests
 │   │           ├── utils/               # Message helper tests
-│   │           └── helpers/             # In-memory test database
+│   │           ├── routes/              # Route tests (fake flows, in-process server)
+│   │           ├── middleware/          # CORS middleware tests
+│   │           └── helpers/             # In-memory test database, in-process server
 │   │
 │   └── client/                          # Flutter app
 │       ├── lib/src/
@@ -143,7 +145,7 @@ dart pub get
 
 ### 2. Explore the database
 
-Open `packages/server/data/music_store.db` in VS Code with the SQLite Viewer
+Open `packages/dart_server/data/music_store.db` in VS Code with the SQLite Viewer
 extension. You'll see 9 tables with real data:
 
 | Table           | Rows | Description                                       |
@@ -161,8 +163,8 @@ extension. You'll see 9 tables with real data:
 ### 3. Run the tests (no API key needed)
 
 ```sh
-# Server — 25 tests using fake models
-dart test packages/server
+# Server: 46 tests using fake models and fake flows
+dart test packages/dart_server
 
 # Client — 14 tests using mock HTTP
 cd packages/client && flutter test
@@ -170,29 +172,32 @@ cd packages/client && flutter test
 
 All tests pass without any Gemini API calls. The server tests use
 `ai.defineModel()` to create fake models that simulate the tool-calling loop.
+The route tests send requests through the server app in process, with no open
+port, to flows that return canned results or fail on purpose.
 The client tests use `MockClient` to return canned HTTP responses.
 
 ### 4. Start the server
 
 ```sh
 export GOOGLE_API_KEY=your-key-here
-dart run packages/server/bin/server.dart
+dart run packages/dart_server/bin/server.dart
 ```
 
 You'll see:
 
 ```
 Server running on http://localhost:8080
-
-Try it:
-  curl -s http://localhost:8080/api/research \
-    -H "Content-Type: application/json" \
-    -d '{"question":"Which genre has the most tracks?"}' | jq
 ```
+
+The server listens on port 8080 because the Flutter client calls
+`http://localhost:8080` (`http://10.0.2.2:8080` on the Android emulator). To
+listen on another port, set `PORT` (the Node server reads it too), for example
+`PORT=8081 dart run packages/dart_server/bin/server.dart`. The client still
+calls 8080, so use another port only for curl testing.
 
 ### 4b. Start the Node.js server (alternative backend)
 
-Use **either** the Dart server **or** the Node server on port **8080** — not both at once. The Node app reads the same database file: `packages/server/data/music_store.db`.
+Use **either** the Dart server **or** the Node server on port **8080** — not both at once. The Node app reads the same database file: `packages/dart_server/data/music_store.db`.
 
 ```sh
 cd packages/nodejs_server
@@ -271,11 +276,11 @@ agent works around this with two separate calls:
 
 - **Flutter client** — complete, working UI with answer card, tool trace panel,
   loading states, error handling, and "New question" reset
-- **Dart server scaffolding** — `packages/server`: `bin/server.dart`, CORS,
+- **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, CORS,
   `request_helpers.dart`, route returning placeholder data
 - **Node server scaffolding** (on starter forks) — `packages/nodejs_server` shell with
   placeholder `POST /api/research`; on **`main`** here, the full Node agent matches the Dart reference
-- **SQLite database** — `packages/server/data/music_store.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)
+- **SQLite database** — `packages/dart_server/data/music_store.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)
 - **Pubspec files** — all dependencies already configured
 - **Client tests** — unit, widget, and integration tests (all passing)
 

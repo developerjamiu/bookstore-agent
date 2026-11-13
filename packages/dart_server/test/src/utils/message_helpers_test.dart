@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:genkit/genkit.dart';
-import 'package:server/src/utils/message_helpers.dart';
+import 'package:dart_server/src/utils/message_helpers.dart';
 import 'package:test/test.dart';
 
 void main() {

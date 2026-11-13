@@ -83,7 +83,7 @@ Type a question and tap the send arrow. You'll see the same placeholder. By the 
 
 ## How the Agent Works
 
-When a user asks _"Who is the top spending customer?"_, the agent doesn't know the answer - and it doesn't know the database schema either. It has to figure both out on its own.
+When a user asks _"Who is the top spending customer?"_, the agent doesn't know the answer, and it doesn't know the database schema either. It has to figure out both on its own.
 
 To do this, it uses three tools that let it explore the database:
 
@@ -91,21 +91,22 @@ To do this, it uses three tools that let it explore the database:
 | --------------- | ----------------------------------------------------- | ---------- | ------------------- |
 | `listTables`    | Discovers what tables exist in the database           | None       | List of table names |
 | `describeTable` | Shows the columns, types, and foreign keys of a table | Table name | Column definitions  |
-| `runQuery`      | Executes a read-only SQL SELECT query                 | SQL string | JSON rows           |
+| `runQuery`      | Executes a read-only SQL SELECT query                 | SQL string | Up to 50 JSON rows  |
 
 The agent decides which tool to call, in what order, and when to stop. A typical conversation looks like this:
 
-1. Agent calls `listTables` - sees `customers`, `invoices`, `invoice_lines`, `tracks`, etc.
-2. Agent calls `describeTable("customers")` - learns the column names and types
-3. Agent calls `describeTable("invoices")` - sees `CustomerId` foreign key, understands the join
-4. Agent calls `describeTable("invoice_lines")` - sees how individual purchases connect
-5. Agent calls `runQuery("SELECT ... JOIN ... GROUP BY ... ORDER BY ... LIMIT 1")` - finds the top spender
-6. Agent calls `runQuery("SELECT ... WHERE CustomerId = ...")` - finds what they bought
-7. Agent decides it has enough and stops
+1. Agent calls `listTables`: sees `customers`, `invoices`, `invoice_lines`, `tracks` and more
+2. Agent calls `describeTable("customers")`: learns the column names and types
+3. Agent calls `describeTable("invoices")`: sees the `CustomerId` foreign key, so it knows how to join
+4. Agent calls `describeTable("invoice_lines")`: sees how individual purchases connect
+5. Agent calls `describeTable("tracks")`: finds where the track names live
+6. Agent calls `runQuery("SELECT ... JOIN ... GROUP BY ... ORDER BY ... LIMIT 1")`: finds the top spender
+7. Agent calls `runQuery("SELECT ... WHERE CustomerId = ...")`: finds what they bought
+8. Agent decides it has enough and stops
 
-This loop - think, act, observe, repeat - is what makes it an agent. The model chooses every step.
+This loop of acting, looking at the result and deciding the next step is what makes it an agent. The model chooses every step.
 
-After the tool loop finishes, if the agent ran at least one query, a second LLM call takes the query results and produces a structured JSON answer with the text, sources (the SQL queries), and a confidence level. Keeping these as two separate calls makes each one simpler and more reliable. Step 4 explains why.
+After the tool loop finishes, a second LLM call turns the query results into a structured JSON answer: the text, the sources (the SQL queries) and a confidence level. Keeping these as two separate calls makes each one simpler and more reliable, and Step 4 explains why. If the agent ran no query at all, for example for a question about the weather, there is nothing to summarize, so it replies directly with low confidence.
 
 Here's what you'll build to make this work:
 
@@ -125,14 +126,16 @@ agent/research_agent.dart
     |   |-- runQuery
     |   (model picks which tool, sees result, picks again)
     |
-    |-- Phase 2: synthesis (outputSchema: ResearchOutput), only if a query ran
+    |-- No query ran? Reply directly, with low confidence
+    |
+    |-- Phase 2: synthesis (outputSchema: ResearchOutput)
     |   (structured JSON from the research notes)
     |
     v
 Flutter UI (renders answer + SQL sources + agent trace)
 ```
 
-Each component has a clear role, and you'll build them bottom-up: schemas first, then tools, then the agent, then the wiring.
+Each component has a clear role, and you'll build them bottom-up: schemas first, then tools, then the message helpers, then the agent, then the wiring.
 
 ---
 

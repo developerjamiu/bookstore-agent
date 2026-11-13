@@ -136,42 +136,16 @@ class ResearchAgent {
     );
     _throwIfFailed(response);
 
-    // The reply did not parse as the schema. Genkit reports that as an error
-    // on the result instead of throwing, so throw it here: the route must
-    // answer 500 rather than a canned 200.
-    final error = response.error;
+    // A reply that does not match the schema comes back as an error on the
+    // result instead of a throw. Fail here so the route answers 500.
     final output = response.output;
     if (output == null) {
-      if (error != null) {
-        throw GenkitException(
-          error.message,
-          status: _statusOf(error),
-          cause: response.cause,
-        );
-      }
-      return ResearchOutput(
-        answer: 'I was unable to produce a structured answer.',
-        sources: const [],
-        confidence: 'low',
-      );
-    }
-
-    // Parsing is lazy: a reply such as {"answer": 42} parses, and the
-    // mistyped field only throws when read. Read every field here so a wrong
-    // shape fails like any other reply that does not match the schema.
-    try {
-      return ResearchOutput(
-        answer: output.answer,
-        sources: output.sources.toList(),
-        confidence: output.confidence,
-      );
-    } on TypeError catch (e) {
       throw GenkitException(
-        'The synthesis reply does not match the expected schema: $e',
-        status: StatusCode.internal,
-        cause: e,
+        response.error?.message ?? 'The model returned no structured answer.',
+        cause: response.cause,
       );
     }
+    return output;
   }
 
   /// Throws when [response] reports a failed generation.
@@ -185,17 +159,9 @@ class ResearchAgent {
 
     final cause = response.cause;
     if (cause is GenkitException) throw cause;
-
-    final error = response.error;
     throw GenkitException(
-      error?.message ?? 'Generation failed.',
-      status: error == null ? null : _statusOf(error),
+      response.error?.message ?? 'Generation failed.',
       cause: cause,
     );
-  }
-
-  static StatusCode? _statusOf(RuntimeError error) {
-    final status = error.status;
-    return status == null ? null : StatusCode.fromWireName(status);
   }
 }

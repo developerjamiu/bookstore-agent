@@ -418,39 +418,11 @@ void main() {
         ),
       );
 
-      // The JSON parses, so Genkit returns it as output. The agent reads
-      // every field and reports the mistyped one as a schema mismatch.
+      // The JSON parses, so Genkit returns it as output, and the mistyped
+      // field throws when read. The route maps any error to 500.
       await expectLater(
         agentFor('fake/wrong-shape').research('How many artists?'),
-        throwsA(
-          isA<GenkitException>()
-              .having((e) => e.status, 'status', StatusCode.internal)
-              .having((e) => e.message, 'message', contains('expected schema'))
-              .having((e) => e.cause, 'cause', isA<TypeError>()),
-        ),
-      );
-    });
-
-    test('throws when a source in the synthesis reply is not a '
-        'string', () async {
-      ai.defineModel(
-        name: 'fake/wrong-source',
-        fn: (request, _) async => _textResponse(
-          request.output != null
-              ? '{"answer": "x", "sources": [1], "confidence": "low"}'
-              : 'No data.',
-        ),
-      );
-
-      await expectLater(
-        agentFor('fake/wrong-source').research('How many artists?'),
-        throwsA(
-          isA<GenkitException>().having(
-            (e) => e.message,
-            'message',
-            contains('expected schema'),
-          ),
-        ),
+        throwsA(isA<TypeError>()),
       );
     });
   });

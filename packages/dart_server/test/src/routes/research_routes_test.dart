@@ -408,8 +408,7 @@ void main() {
             500,
             'Agent failed. Check server logs for details.',
           );
-          expect(printed.single, startsWith('Genkit error: '));
-          expect(printed.single, contains('expected schema'));
+          expect(printed.single, startsWith('Unexpected error: '));
         },
       );
     });

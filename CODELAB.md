@@ -35,7 +35,7 @@ dart pub get
 
 The starter project includes a **complete Flutter app** and a **Dart server skeleton**. The server currently returns placeholder data — your job is to build the AI agent that powers it.
 
-The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP server framework. Some of it is pre-built scaffolding you won't change: `packages/dart_server/lib/src/app.dart` defines `buildApp`, which puts CORS and request logging in front of your routes, and `packages/dart_server/lib/src/utils/request_helpers.dart` parses JSON bodies and builds JSON responses.
+The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP server framework. Some of it is pre-built scaffolding you won't change: `packages/dart_server/lib/src/middleware/cors.dart` adds CORS headers so browsers can call the API, and `packages/dart_server/lib/src/utils/request_helpers.dart` parses JSON bodies and builds JSON responses.
 
 **Browse the database:**
 
@@ -111,8 +111,6 @@ Here's what you'll build to make this work:
 User question
     |
 bin/server.dart (opens DB, creates Genkit, starts Relic)
-    |
-app.dart (pre-built: CORS + request logging)
     |
 routes/research.dart (receives POST, calls the agent flow)
     |
@@ -863,7 +861,7 @@ import 'package:relic/relic.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'package:dart_server/src/agent/setup.dart';
-import 'package:dart_server/src/app.dart';
+import 'package:dart_server/src/middleware/cors.dart';
 import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
@@ -877,16 +875,22 @@ Future<void> main() async {
   final researchFlow = AISetup(ai: ai, db: sqlite3.open(dbPath))();
   final routes = ResearchRoutes(researchFlow: researchFlow);
 
+  // Middleware only runs for requests that match a route, so the router is
+  // mounted for every method and path. That way cors() also answers
+  // preflights and adds its headers to 404 and 405 responses.
+  final app = RelicApp()
+    ..use('/', cors())
+    ..use('/', logRequests())
+    ..any('/**', routes.router.asHandler);
+
   final port = int.parse(Platform.environment['PORT'] ?? '8080');
-  final server = await buildApp(
-    routes.router,
-  ).serve(address: InternetAddress.anyIPv4, port: port);
+  final server = await app.serve(address: InternetAddress.anyIPv4, port: port);
 
   print('Server running on http://localhost:${server.port}');
 }
 ```
 
-Reading `PORT`, `buildApp` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `buildApp` comes from the pre-built `packages/dart_server/lib/src/app.dart`: it mounts your router behind the CORS and request-logging middleware, so every response gets CORS headers, including the 404 and 405 answers for unknown paths and methods. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
+The `RelicApp` setup, reading `PORT` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `RelicApp` is the server's router: `use` adds middleware, here the pre-built `cors()` and Relic's `logRequests()`. Relic only runs middleware for requests that match a route, so `any('/**', ...)` mounts your router for every method and path; that way CORS headers also reach browser preflights and 404 and 405 answers. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
 
 **Test it live** from the repository root. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..` first.
 

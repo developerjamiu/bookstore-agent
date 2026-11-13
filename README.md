@@ -76,7 +76,6 @@ research_assistant/
 │   │   ├── bin/server.dart              # Relic server entrypoint
 │   │   ├── data/music_store.db          # Pre-seeded SQLite database
 │   │   ├── lib/src/
-│   │   │   ├── app.dart                 # CORS + request logging for every request
 │   │   │   ├── agent/
 │   │   │   │   ├── research_agent.dart  # Two-phase agent: tool loop + synthesis
 │   │   │   │   └── setup.dart           # Composition root (DI wiring)
@@ -263,8 +262,8 @@ agent works around this with two separate calls:
 
 - **Flutter client** — complete, working UI with answer card, tool trace panel,
   loading states, error handling, and "New question" reset
-- **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, `app.dart`
-  (CORS and request logging), `request_helpers.dart`, placeholder `POST /api/research`
+- **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, CORS,
+  `request_helpers.dart`, placeholder `POST /api/research`
 - **Node server scaffolding** — `packages/nodejs_server`: HTTP server, CORS,
   placeholder `POST /api/research` (see **Repository Structure**). No SQLite or Genkit flows yet.
 - **SQLite database** — `packages/dart_server/data/music_store.db` pre-seeded with all 9 tables

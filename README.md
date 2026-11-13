@@ -250,13 +250,13 @@ answer must come from actual query results, not the model's training data.
 ### Two-phase generate pattern
 
 Sending `tools` and `outputSchema` in one Gemini call is only a preview
-feature. In a live test on 2026-11-13, a single call with both made the model
-loop on tool calls without ever answering. Two separate calls keep the
-research and the structured answer reliable:
+feature. When we tried it, a single call with both made the model loop on
+tool calls without ever answering. Two separate calls keep the research and
+the structured answer reliable:
 
-1. **Research phase** — tools enabled, `maxTurns: 10`, model explores freely
-2. **Synthesis phase** — `outputSchema` enabled, model produces structured
-   JSON from the research notes
+1. **Research phase**: tools enabled, `maxTurns: 10`, model explores freely
+2. **Synthesis phase**: runs only when a query ran. `outputSchema` enabled,
+   model produces structured JSON from the research notes
 
 ## What the Starter Branch Contains
 

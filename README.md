@@ -193,11 +193,6 @@ You'll see:
 
 ```
 Server running on http://localhost:8080
-
-Try it:
-  curl -s http://localhost:8080/api/research \
-    -H "Content-Type: application/json" \
-    -d '{"question":"Which genre has the most tracks?"}' | jq
 ```
 
 ### 5. Test with curl

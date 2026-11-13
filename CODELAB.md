@@ -867,40 +867,26 @@ import 'package:dart_server/src/app.dart';
 import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
-  final portText = Platform.environment['PORT'] ?? '8080';
-  final port = int.tryParse(portText);
-  if (port == null || port < 0 || port > 65535) {
-    stderr.writeln('PORT must be a number from 0 to 65535, got "$portText".');
-    exit(1);
-  }
-
   final dbPath = Platform.script.resolve('../data/music_store.db').toFilePath();
   if (!File(dbPath).existsSync()) {
     stderr.writeln('Database not found at $dbPath.');
     exit(1);
   }
-  final db = sqlite3.open(dbPath);
 
   final ai = Genkit(plugins: [googleAI()]);
-  final researchFlow = AISetup(ai: ai, db: db)();
+  final researchFlow = AISetup(ai: ai, db: sqlite3.open(dbPath))();
+  final routes = ResearchRoutes(researchFlow: researchFlow);
 
-  final researchRoutes = ResearchRoutes(researchFlow: researchFlow);
+  final port = int.parse(Platform.environment['PORT'] ?? '8080');
+  final server = await buildApp(
+    routes.router,
+  ).serve(address: InternetAddress.anyIPv4, port: port);
 
-  final app = buildApp(researchRoutes.router);
-
-  final server = await app.serve(address: InternetAddress.anyIPv4, port: port);
-  print('');
   print('Server running on http://localhost:${server.port}');
-  print('');
-  print('Try it:');
-  print('  curl -s http://localhost:${server.port}/api/research \\');
-  print('    -H "Content-Type: application/json" \\');
-  print('    -d \'{"question":"Which genre has the most tracks?"}\' | jq');
-  print('');
 }
 ```
 
-The `PORT` check, `buildApp` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `buildApp` comes from the pre-built `packages/dart_server/lib/src/app.dart`: it mounts your router behind the CORS and request-logging middleware, so every response gets CORS headers, including the 404 and 405 answers for unknown paths and methods. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
+Reading `PORT`, `buildApp` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `buildApp` comes from the pre-built `packages/dart_server/lib/src/app.dart`: it mounts your router behind the CORS and request-logging middleware, so every response gets CORS headers, including the 404 and 405 answers for unknown paths and methods. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
 
 **Test it live** from the repository root. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..` first.
 

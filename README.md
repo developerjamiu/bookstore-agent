@@ -41,13 +41,13 @@ Every tool call is a **decision the model made** — visible in the UI's
 | ------------ | ----------------------------------------------------------- |
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) |
 | LLM          | Google Gemini (via `genkit_google_genai`)                   |
-| Server       | Shelf (Dart) or Node.js HTTP server (`packages/server` · `packages/nodeJS-server`) |
+| Server       | Shelf (Dart) or Node.js HTTP server (`packages/server` · `packages/nodejs_server`) |
 | Database     | SQLite (in-process, no server needed)                       |
 | Schemas      | Schemantic (code-generated JSON schemas)                    |
 | Client       | Flutter (Material 3)                                        |
 | Testing      | Fake models via `ai.defineModel()` — no mocking libraries   |
 
-**Node.js backend (optional):** same HTTP API for the Flutter client. Use [Genkit for JavaScript](https://genkit.dev/docs/js/get-started/) with `@genkit-ai/google-genai`, **Zod** schemas via `genkit`, **`better-sqlite3`**, and TypeScript in `packages/nodeJS-server/`.
+**Node.js backend (optional):** same HTTP API for the Flutter client. Use [Genkit for JavaScript](https://genkit.dev/docs/js/get-started/) with `@genkit-ai/google-genai`, **Zod** schemas via `genkit`, **`better-sqlite3`**, and TypeScript in `packages/nodejs_server/`.
 
 ## Repository Structure
 
@@ -57,7 +57,7 @@ research_assistant/
 ├── README.md
 │
 ├── packages/
-│   ├── nodeJS-server/                   # Node + Genkit (TypeScript) — same /api/research API
+│   ├── nodejs_server/                   # Node + Genkit (TypeScript) — same /api/research API
 │   │   ├── package.json
 │   │   ├── package-lock.json
 │   │   ├── tsconfig.json
@@ -128,7 +128,7 @@ research_assistant/
 - **Dart SDK** >= 3.11 (`dart --version`)
 - **Flutter SDK** >= 3.27 (`flutter --version`)
 - **Google AI API key** — get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (set `GOOGLE_API_KEY` for Dart; `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Node — never commit keys)
-- **Node.js** >= 20 (`node --version`) — only if you run `packages/nodeJS-server`
+- **Node.js** >= 20 (`node --version`) — only if you run `packages/nodejs_server`
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) to browse the database visually
 
 ## Getting Started
@@ -195,7 +195,7 @@ Try it:
 Use **either** the Dart server **or** the Node server on port **8080** — not both at once. The Node app reads the same database file: `packages/server/data/music_store.db`.
 
 ```sh
-cd packages/nodeJS-server
+cd packages/nodejs_server
 npm install
 export GEMINI_API_KEY=your-key-here
 npm start
@@ -273,7 +273,7 @@ agent works around this with two separate calls:
   loading states, error handling, and "New question" reset
 - **Dart server scaffolding** — `packages/server`: `bin/server.dart`, CORS,
   `request_helpers.dart`, route returning placeholder data
-- **Node server scaffolding** (on starter forks) — `packages/nodeJS-server` shell with
+- **Node server scaffolding** (on starter forks) — `packages/nodejs_server` shell with
   placeholder `POST /api/research`; on **`main`** here, the full Node agent matches the Dart reference
 - **SQLite database** — `packages/server/data/music_store.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)
 - **Pubspec files** — all dependencies already configured
@@ -292,7 +292,7 @@ agent works around this with two separate calls:
 | **Agent tests** — `research_agent_test.dart`                                                                                    | Test the agent using `ai.defineModel()` with fake responses                   |
 | **Tool tests** — `list_tables_test.dart`, `describe_table_test.dart`, `run_query_test.dart`                                     | Test each tool's logic method against a real in-memory database               |
 
-**Node track (`packages/nodeJS-server/`):** add Zod schemas, tools, `messageHelpers`, `ResearchAgent`, `setup`, then wire `research.ts` and `index.ts` (same API as Dart for Flutter).
+**Node track (`packages/nodejs_server/`):** add Zod schemas, tools, `messageHelpers`, `ResearchAgent`, `setup`, then wire `research.ts` and `index.ts` (same API as Dart for Flutter).
 
 ### The codelab experience
 

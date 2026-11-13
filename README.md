@@ -52,7 +52,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 ## Repository Structure
 
 ```
-research_assistant/
+music-store-agent/
 ├── pubspec.yaml                         # Dart workspace root
 ├── README.md
 │
@@ -128,6 +128,8 @@ research_assistant/
 ## Prerequisites
 
 - **Flutter SDK** with Dart 3.12 or later (`flutter --version`)
+- **iOS Simulator or Android emulator** (Xcode or Android Studio), to run the Flutter app
+- **jq**, to format JSON in the terminal ([install](https://jqlang.org/download/))
 - **Google AI API key** — get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (set `GOOGLE_API_KEY` for Dart; `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Node — never commit keys)
 - **Node.js** >= 20 (`node --version`) — only if you run `packages/nodejs_server`
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) to browse the database visually
@@ -137,9 +139,9 @@ research_assistant/
 ### 1. Clone and install dependencies
 
 ```sh
-git clone <repo-url>
-cd research_assistant
-dart pub get
+git clone https://github.com/developerjamiu/music-store-agent.git
+cd music-store-agent
+flutter pub get
 ```
 
 ### 2. Explore the database
@@ -233,7 +235,7 @@ curl -s http://localhost:8080/api/research \
 
 ### 6. Run the Flutter app
 
-With the server running:
+With the server running, start an iOS Simulator or Android emulator, then:
 
 ```sh
 cd packages/client

@@ -539,6 +539,9 @@ import '../schemas/sql_query_input.dart';
 import '../schemas/table_name_input.dart';
 import '../utils/message_helpers.dart';
 
+/// A Genkit flow that takes a question and returns a [ResearchResult].
+typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
+
 class ResearchAgent {
   static const _prompt =
       'You are a database analyst. Answer questions ONLY from the results of '
@@ -580,7 +583,7 @@ class ResearchAgent {
     required this._runQueryTool,
   }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
-  Flow<String, ResearchResult, Never, Never> define() {
+  ResearchFlow define() {
     return _ai.defineFlow(
       name: 'researchFlow',
       inputSchema: SchemanticType.string(),
@@ -643,7 +646,7 @@ How it works:
 - **No query, low confidence:** if the model never called `runQuery`, nothing came from the database, so the answer gets `low` confidence and no sources.
 - **Errors:** Genkit doesn't throw when the model call fails. It returns a result with no `output`. The agent throws instead, so the route in Step 6 can answer with an HTTP error.
 
-`define()` wraps `research` in a Genkit flow, the function the route will run.
+`define()` wraps `research` in a Genkit flow, the function the route will run. Its type, `ResearchFlow`, is a `typedef`: a short name for `Flow<String, ResearchResult, Never, Never>`. A question goes in and a `ResearchResult` comes out. Steps 5 and 6 use the short name.
 
 **Verify:** `dart analyze` prints `No issues found!`
 
@@ -657,16 +660,12 @@ Create `packages/dart_server/lib/src/agent/setup.dart`. It creates the tools and
 import 'package:genkit/genkit.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../schemas/research_result.dart';
 import '../tools/describe_table.dart';
 import '../tools/list_tables.dart';
 import '../tools/run_query.dart';
 import 'research_agent.dart';
 
-Flow<String, ResearchResult, Never, Never> createResearchFlow({
-  required Genkit ai,
-  required Database db,
-}) {
+ResearchFlow createResearchFlow({required Genkit ai, required Database db}) {
   return ResearchAgent(
     ai: ai,
     listTablesTool: ListTablesTool(ai: ai, db: db).define(),
@@ -688,21 +687,15 @@ Replace the contents of `packages/dart_server/lib/src/routes/research.dart` with
 import 'package:genkit/genkit.dart';
 import 'package:relic/relic.dart';
 
-import '../schemas/research_result.dart';
+import '../agent/research_agent.dart';
 import '../utils/request_helpers.dart';
-
-typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 
 class ResearchRoutes {
   final ResearchFlow _researchFlow;
 
   ResearchRoutes({required this._researchFlow});
 
-  RelicRouter get router {
-    final router = RelicRouter();
-    router.post('/api/research', _research);
-    return router;
-  }
+  RelicRouter get router => RelicRouter()..post('/api/research', _research);
 
   Future<Response> _research(Request request) async {
     final body = await parseJsonBody(request);
@@ -728,7 +721,7 @@ class ResearchRoutes {
 
 How it works:
 
-- **Routing with Relic:** `RelicRouter` sends `POST /api/research` to `_research`. A Relic handler takes a `Request` and returns a `Response`.
+- **Routing with Relic:** `RelicRouter()..post('/api/research', _research)` creates a router whose one route sends `POST /api/research` to `_research`. The `..` (a cascade) calls `post` on the new router and gives back the router itself. A Relic handler like `_research` takes a `Request` and returns a `Response`.
 - **Running the agent:** `_researchFlow(question)` runs the agent, and `result.toJson()` turns the `ResearchResult` into the JSON the app reads.
 - **Errors:** `handleGenkitError`, from `request_helpers.dart`, turns a Genkit error into an HTTP status: 429 when your API quota runs out, 503 when the model is overloaded, and 500 otherwise.
 

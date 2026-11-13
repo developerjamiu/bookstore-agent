@@ -22,7 +22,6 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) with Dart 3.12 or later (check with `flutter --version`)
 - A Google AI API key ([get one free](https://aistudio.google.com/apikey))
 - An iOS Simulator (Xcode) or Android emulator (Android Studio) to run the Flutter app
-- [jq](https://jqlang.org/download/) to format JSON in the terminal
 
 ---
 
@@ -58,10 +57,10 @@ It listens on port 8080, where the Flutter app expects it. Leave it running and 
 ```sh
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}' | jq
+  -d '{"question":"What artists are in the database?"}'
 ```
 
-You'll see:
+You'll see this JSON (formatted here for easier reading):
 
 ```json
 {
@@ -948,7 +947,7 @@ dart run packages/dart_server/bin/server.dart
 ```sh
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"Which genre has the most tracks?"}' | jq
+  -d '{"question":"Which genre has the most tracks?"}'
 ```
 
 You should see an answer naming Rock (31 tracks), the SQL behind it in `sources`, and `toolCalls` showing the agent's exploration sequence. The wording varies by run. Open the Flutter app and try it there too: the placeholder is gone.
@@ -978,22 +977,22 @@ You now have a working agent that answers from real query results.
 # Simple lookup
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}' | jq
+  -d '{"question":"What artists are in the database?"}'
 
 # Multi-table JOINs
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"Who is the top spending customer and what did they buy?"}' | jq
+  -d '{"question":"Who is the top spending customer and what did they buy?"}'
 
 # Many-to-many relationship
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What songs are in the Chill Jazz playlist?"}' | jq
+  -d '{"question":"What songs are in the Chill Jazz playlist?"}'
 
 # Out of scope: the agent should refuse politely
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What is the weather today?"}' | jq
+  -d '{"question":"What is the weather today?"}'
 ```
 
 ### What's Next

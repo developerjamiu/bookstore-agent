@@ -119,7 +119,6 @@ music-store-agent/
 
 - **Flutter SDK** with Dart 3.12 or later (`flutter --version`)
 - **iOS Simulator or Android emulator** (Xcode or Android Studio), to run the Flutter app
-- **jq**, to format JSON in the terminal ([install](https://jqlang.org/download/))
 - **Node.js** >= 20 — for `packages/nodejs_server` only
 - **Google AI API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (`GOOGLE_API_KEY` / `GEMINI_API_KEY`; never commit keys)
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer)
@@ -201,22 +200,22 @@ Server running on http://localhost:8080
 # Simple lookup
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}' | jq
+  -d '{"question":"What artists are in the database?"}'
 
 # Requires multi-table JOINs — watch the toolCalls array
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"Who is the top spending customer and what did they buy?"}' | jq
+  -d '{"question":"Who is the top spending customer and what did they buy?"}'
 
 # Many-to-many relationship
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What songs are in the Chill Jazz playlist?"}' | jq
+  -d '{"question":"What songs are in the Chill Jazz playlist?"}'
 
 # Out of scope — agent should gracefully refuse
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What is the weather today?"}' | jq
+  -d '{"question":"What is the weather today?"}'
 ```
 
 ### 6. Run the Flutter app

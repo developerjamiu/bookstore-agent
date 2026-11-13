@@ -606,7 +606,6 @@ class ResearchAgent {
       outputSchema: ResearchOutput.$schema,
       maxTurns: _maxTurns,
     );
-    _throwIfFailed(response);
     final toolCalls = extractToolCalls(response.messages);
 
     // The model hit the turn limit before it wrote an answer.
@@ -619,13 +618,15 @@ class ResearchAgent {
       );
     }
 
-    // A reply that does not match the schema comes back as an error on the
-    // result instead of a throw. Fail here so the route answers 500.
+    // Genkit reports failures in the result instead of throwing.
+    // Throw here so the route answers with an HTTP error.
     final output = response.output;
     if (output == null) {
+      final cause = response.cause;
+      if (cause is GenkitException) throw cause;
       throw GenkitException(
-        response.error?.message ?? 'The model returned no structured answer.',
-        cause: response.cause,
+        response.error?.message ?? 'The model returned no answer.',
+        cause: cause,
       );
     }
 
@@ -638,21 +639,6 @@ class ResearchAgent {
       toolCalls: toolCalls,
     );
   }
-
-  /// Throws if the model call failed.
-  ///
-  /// Genkit 1.0 reports failures in the result instead of throwing, so this
-  /// turns them back into an error the route can send as an HTTP error.
-  static void _throwIfFailed(GenerateResult response) {
-    if (response.finishReason != FinishReason.failed) return;
-
-    final cause = response.cause;
-    if (cause is GenkitException) throw cause;
-    throw GenkitException(
-      response.error?.message ?? 'Generation failed.',
-      cause: cause,
-    );
-  }
 }
 ```
 
@@ -662,7 +648,7 @@ How it works:
 - **One call:** `generate` gets your three tools and `outputSchema`. Gemini calls tools as often as it needs, up to 10 times, then replies as a `ResearchOutput`.
 - **Turn limit:** if Gemini runs out of turns before answering, the agent says it couldn't finish instead of guessing.
 - **No query, low confidence:** if the model never called `runQuery`, nothing came from the database, so the answer gets `low` confidence and no sources. That is how a question the database can't answer, like "What is the weather today?", gets a polite refusal.
-- **Errors:** `_throwIfFailed` turns a failed model call into an error, which the route sends back as an HTTP error in Step 6.
+- **Errors:** Genkit doesn't throw when the model call fails. It returns a result with no `output`. The agent throws instead, so the route in Step 6 can answer with an HTTP error.
 
 `call()` wraps `research` in a Genkit flow, the function the route will run.
 

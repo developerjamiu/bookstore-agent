@@ -131,16 +131,38 @@ class ResearchAgent {
     // on the result instead of throwing, so throw it here: the route must
     // answer 500 rather than a canned 200.
     final error = response.error;
-    if (response.output == null && error != null) {
-      throw GenkitException(error.message, status: _statusOf(error));
+    final output = response.output;
+    if (output == null) {
+      if (error != null) {
+        throw GenkitException(
+          error.message,
+          status: _statusOf(error),
+          cause: response.cause,
+        );
+      }
+      return ResearchOutput(
+        answer: 'I was unable to produce a structured answer.',
+        sources: const [],
+        confidence: 'low',
+      );
     }
 
-    return response.output ??
-        ResearchOutput(
-          answer: 'I was unable to produce a structured answer.',
-          sources: const [],
-          confidence: 'low',
-        );
+    // Parsing is lazy: a reply such as {"answer": 42} parses, and the
+    // mistyped field only throws when read. Read every field here so a wrong
+    // shape fails like any other reply that does not match the schema.
+    try {
+      return ResearchOutput(
+        answer: output.answer,
+        sources: output.sources.toList(),
+        confidence: output.confidence,
+      );
+    } on TypeError catch (e) {
+      throw GenkitException(
+        'The synthesis reply does not match the expected schema: $e',
+        status: StatusCode.internal,
+        cause: e,
+      );
+    }
   }
 
   /// Throws when [response] reports a failed generation.

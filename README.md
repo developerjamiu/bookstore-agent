@@ -163,7 +163,7 @@ extension. You'll see 9 tables with real data:
 ### 3. Run the tests (no API key needed)
 
 ```sh
-# Server: 72 tests using fake models and fake flows
+# Server: 73 tests using fake models and fake flows
 dart test packages/dart_server
 
 # Client — 14 tests using mock HTTP

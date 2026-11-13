@@ -7,22 +7,14 @@ import '../tools/list_tables.dart';
 import '../tools/run_query.dart';
 import 'research_agent.dart';
 
-class AISetup {
-  final Genkit _ai;
-  final Database _db;
-
-  AISetup({required this._ai, required this._db});
-
-  Flow<String, ResearchResult, Never, Never> call() {
-    final listTablesTool = ListTablesTool(ai: _ai, db: _db);
-    final describeTableTool = DescribeTableTool(ai: _ai, db: _db);
-    final runQueryTool = RunQueryTool(ai: _ai, db: _db);
-
-    return ResearchAgent(
-      ai: _ai,
-      listTablesTool: listTablesTool(),
-      describeTableTool: describeTableTool(),
-      runQueryTool: runQueryTool(),
-    )();
-  }
+Flow<String, ResearchResult, Never, Never> createResearchFlow({
+  required Genkit ai,
+  required Database db,
+}) {
+  return ResearchAgent(
+    ai: ai,
+    listTablesTool: ListTablesTool(ai: ai, db: db).define(),
+    describeTableTool: DescribeTableTool(ai: ai, db: db).define(),
+    runQueryTool: RunQueryTool(ai: ai, db: db).define(),
+  ).define();
 }

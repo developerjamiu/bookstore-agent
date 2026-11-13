@@ -19,7 +19,7 @@ class RunQueryTool {
 
   RunQueryTool({required this._ai, required this._db});
 
-  Tool<SqlQueryInput, String> call() {
+  Tool<SqlQueryInput, String> define() {
     return _ai.defineTool(
       name: 'runQuery',
       description:

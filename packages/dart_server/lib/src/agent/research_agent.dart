@@ -49,7 +49,7 @@ class ResearchAgent {
     required this._runQueryTool,
   }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
-  Flow<String, ResearchResult, Never, Never> call() {
+  Flow<String, ResearchResult, Never, Never> define() {
     return _ai.defineFlow(
       name: 'researchFlow',
       inputSchema: SchemanticType.string(),

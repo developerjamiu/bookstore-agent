@@ -17,7 +17,7 @@ Future<void> main() async {
   }
 
   final ai = Genkit(plugins: [googleAI()]);
-  final researchFlow = AISetup(ai: ai, db: sqlite3.open(dbPath))();
+  final researchFlow = createResearchFlow(ai: ai, db: sqlite3.open(dbPath));
   final routes = ResearchRoutes(researchFlow: researchFlow);
 
   // Mounted for every path so cors() also reaches preflights and 404/405s.

@@ -258,7 +258,7 @@ void main() {
           listTablesTool: tool('listTables', SchemanticType.voidSchema()),
           describeTableTool: tool('describeTable', TableNameInput.$schema),
           runQueryTool: tool('runQuery', SqlQueryInput.$schema),
-        )();
+        ).define();
       }
 
       ModelResponse text(String text) => ModelResponse(

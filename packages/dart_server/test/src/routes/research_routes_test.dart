@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:dart_server/src/app.dart';
 import 'package:dart_server/src/routes/research.dart';
 import 'package:dart_server/src/schemas/research_result.dart';
 import 'package:dart_server/src/schemas/tool_call.dart';
@@ -11,7 +10,6 @@ import 'package:relic/relic.dart';
 import 'package:schemantic/schemantic.dart';
 import 'package:test/test.dart';
 
-import '../helpers/cors_expectations.dart';
 import '../helpers/in_process_server.dart';
 
 final _url = Uri.parse('http://localhost/api/research');
@@ -30,12 +28,6 @@ Body _json(Object? value) =>
 
 Headers _contentType(String value) =>
     Headers.build((headers) => headers['Content-Type'] = [value]);
-
-void _discardLog(
-  String message, {
-  StackTrace? stackTrace,
-  LoggerType type = LoggerType.info,
-}) {}
 
 void main() {
   late Genkit ai;
@@ -64,7 +56,8 @@ void main() {
     );
   }
 
-  /// Sends one request through the same app that `bin/server.dart` serves.
+  /// Sends one request through a RelicApp with the routes injected, as
+  /// `bin/server.dart` does.
   ///
   /// The lines the route prints go to [printed] instead of the test output.
   Future<Response> send(
@@ -75,7 +68,7 @@ void main() {
   }) {
     final flow = defineResearchFlow(answer ?? () async => _cannedResult());
     final routes = ResearchRoutes(researchFlow: flow);
-    final app = buildApp(routes.router, logger: _discardLog);
+    final app = RelicApp()..inject(routes);
     return runZoned(
       () => handle(app.asHandler, method, _url, headers: headers, body: body),
       zoneSpecification: ZoneSpecification(
@@ -92,7 +85,6 @@ void main() {
     expect(response.statusCode, statusCode);
     expect(response.body.bodyType?.toHeaderValue(), _jsonType);
     expect(await response.readAsString(), '{"error":"$message"}');
-    expectCorsHeaders(response);
   }
 
   group('POST /api/research', () {
@@ -113,7 +105,6 @@ void main() {
         '"confidence":"high",'
         '"toolCalls":[{"tool":"listTables","input":"{}"}]}',
       );
-      expectCorsHeaders(response);
       expect(questions, ['Which genre has the most tracks?']);
       expect(printed, isEmpty);
     });
@@ -223,18 +214,11 @@ void main() {
     });
   });
 
-  group('OPTIONS /api/research', () {
-    test('answers the preflight with 200 and the CORS headers', () async {
-      final response = await send(Method.options);
+  test('answers 405 with Allow: POST for other methods', () async {
+    final response = await send(Method.get);
 
-      expect(response.statusCode, 200);
-      expect(await response.readAsString(), isEmpty);
-      expect(
-        response.body.bodyType?.toHeaderValue(),
-        'text/plain; charset=utf-8',
-      );
-      expectCorsHeaders(response);
-      expect(questions, isEmpty);
-    });
+    expect(response.statusCode, 405);
+    expect(response.headers['allow'], ['POST']);
+    expect(questions, isEmpty);
   });
 }

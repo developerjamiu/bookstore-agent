@@ -69,6 +69,38 @@ void main() {
     });
   });
 
+  group('hasQueryResults', () {
+    Message toolResponse(String name) => Message(
+      role: Role.tool,
+      content: [
+        ToolResponsePart(
+          toolResponse: ToolResponse(name: name, output: 'output'),
+        ),
+      ],
+    );
+
+    test('is true when a runQuery call returned output', () {
+      expect(
+        hasQueryResults([toolResponse('listTables'), toolResponse('runQuery')]),
+        isTrue,
+      );
+    });
+
+    test('is false when only schema tools returned output', () {
+      expect(
+        hasQueryResults([
+          toolResponse('listTables'),
+          toolResponse('describeTable'),
+        ]),
+        isFalse,
+      );
+    });
+
+    test('is false for an empty history', () {
+      expect(hasQueryResults(const []), isFalse);
+    });
+  });
+
   group('buildResearchNotes', () {
     test('includes runQuery results with their SQL', () {
       final response = _buildResponse(

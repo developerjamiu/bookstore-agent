@@ -25,6 +25,12 @@ class ResearchAgent {
       '5. If the question cannot be answered with the available data, say so.\n\n'
       'NEVER answer from your own knowledge. All answers must come from query results.';
 
+  static const _maxTurns = 10;
+
+  static const _outOfTurnsAnswer =
+      "I couldn't finish researching this question within the allowed "
+      'steps. Try asking something more specific.';
+
   static const _synthesisPrompt =
       'You are a database analyst. Using ONLY the research notes below, '
       'produce a structured answer to the user\'s question.\n\n'
@@ -65,8 +71,21 @@ class ResearchAgent {
   Future<ResearchResult> research(String question) async {
     final researchResponse = await _runResearchPhase(question);
     final toolCalls = extractToolCalls(researchResponse.messages);
-    final notes = buildResearchNotes(researchResponse);
 
+    // The tool loop ran out of turns. The result still holds the history,
+    // so the notes come from the queries the agent really ran. With no query
+    // results at all, there is nothing true to synthesize from.
+    final outOfTurns = researchResponse.finishReason == FinishReason.aborted;
+    if (outOfTurns && !hasQueryResults(researchResponse.messages)) {
+      return ResearchResult(
+        answer: _outOfTurnsAnswer,
+        sources: const [],
+        confidence: 'low',
+        toolCalls: toolCalls,
+      );
+    }
+
+    final notes = buildResearchNotes(researchResponse);
     final synthesis = await _runSynthesisPhase(question, notes);
 
     return ResearchResult(
@@ -77,53 +96,30 @@ class ResearchAgent {
     );
   }
 
+  /// Runs the tool loop.
+  ///
+  /// When the loop reaches `maxTurns`, Genkit returns a result with
+  /// `finishReason: aborted` that keeps the messages so far, instead of
+  /// throwing. A cancel also ends as aborted, but this agent passes no
+  /// cancellation token, so here aborted always means the turn limit.
   Future<GenerateResult> _runResearchPhase(String question) async {
-    try {
-      final response = await _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [TextPart(text: _researchPrompt)],
-          ),
-          Message(
-            role: Role.user,
-            content: [TextPart(text: question)],
-          ),
-        ],
-        tools: [_listTablesTool, _describeTableTool, _runQueryTool],
-        maxTurns: 10,
-      );
-      // A maxTurns overrun now resolves as an aborted result instead of
-      // throwing. Treat it as a failure here so the catch below still runs.
-      _throwIfFailed(response, alsoAborted: true);
-      return response;
-    } on GenkitException catch (e) {
-      if (!e.message.contains('max turns')) rethrow;
-
-      final response = await _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [
-              TextPart(
-                text:
-                    'You ran out of tool-calling turns. Summarize what you '
-                    'learned from the query results below. Do not call any '
-                    'more tools.',
-              ),
-            ],
-          ),
-          Message(
-            role: Role.user,
-            content: [TextPart(text: question)],
-          ),
-        ],
-      );
-      _throwIfFailed(response);
-      return response;
-    }
+    final response = await _ai.generate(
+      model: _model,
+      messages: [
+        Message(
+          role: Role.system,
+          content: [TextPart(text: _researchPrompt)],
+        ),
+        Message(
+          role: Role.user,
+          content: [TextPart(text: question)],
+        ),
+      ],
+      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
+      maxTurns: _maxTurns,
+    );
+    _throwIfFailed(response);
+    return response;
   }
 
   Future<ResearchOutput> _runSynthesisPhase(
@@ -170,16 +166,8 @@ class ResearchAgent {
   /// a result with `finishReason: failed`, the thrown object as `cause` and
   /// a structured `error`. Rethrowing keeps the route's error handling, which
   /// maps a [GenkitException] status to an HTTP status.
-  ///
-  /// With [alsoAborted], an aborted result (a maxTurns overrun) throws too.
-  static void _throwIfFailed(
-    GenerateResult response, {
-    bool alsoAborted = false,
-  }) {
-    final failed =
-        response.finishReason == FinishReason.failed ||
-        (alsoAborted && response.finishReason == FinishReason.aborted);
-    if (!failed) return;
+  static void _throwIfFailed(GenerateResult response) {
+    if (response.finishReason != FinishReason.failed) return;
 
     final cause = response.cause;
     if (cause is GenkitException) throw cause;

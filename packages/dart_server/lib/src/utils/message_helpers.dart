@@ -29,6 +29,20 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
   return calls;
 }
 
+/// Whether any `runQuery` call in [messages] returned output.
+bool hasQueryResults(List<Message> messages) {
+  for (final message in messages) {
+    if (message.role != Role.tool) continue;
+    for (final part in message.content) {
+      final toolResponse = part.toolResponsePart?.toolResponse;
+      if (toolResponse?.name == 'runQuery' && toolResponse?.output != null) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Builds synthesis-ready notes from a completed research response.
 ///
 /// Includes only `runQuery` results (not schema exploration output)

@@ -106,6 +106,92 @@ void main() {
     });
   });
 
+  group('ResearchAgent out of turns', () {
+    /// Defines a model named [name] that never stops calling tools: every
+    /// research turn requests [nextTool]. Synthesis requests go to
+    /// [synthesisRequests] and get a structured answer.
+    void defineEndlessModel(
+      String name,
+      ToolRequest Function(int turn) nextTool,
+      List<ModelRequest> synthesisRequests,
+    ) {
+      ai.defineModel(
+        name: name,
+        fn: (request, _) async {
+          if (request.output != null) {
+            synthesisRequests.add(request);
+            return _structuredResponse(request);
+          }
+          final turn = request.messages.where((m) => m.role == Role.tool);
+          return ModelResponse(
+            finishReason: FinishReason.stop,
+            message: Message(
+              role: Role.model,
+              content: [ToolRequestPart(toolRequest: nextTool(turn.length))],
+            ),
+          );
+        },
+      );
+    }
+
+    test('synthesizes from the query results it already has', () async {
+      final synthesisRequests = <ModelRequest>[];
+      defineEndlessModel(
+        'fake/endless-queries',
+        (turn) => ToolRequest(
+          ref: 'q$turn',
+          name: 'runQuery',
+          input: {'sql': 'SELECT Name FROM artists LIMIT $turn'},
+        ),
+        synthesisRequests,
+      );
+
+      final result = await agentFor(
+        'fake/endless-queries',
+      ).research('What artists are in the database?');
+
+      expect(synthesisRequests, hasLength(1));
+      final notes = synthesisRequests.single.messages
+          .where((m) => m.role == Role.user)
+          .map((m) => m.text)
+          .join('\n');
+      expect(notes, contains('[Query: SELECT Name FROM artists LIMIT 0]'));
+      expect(notes, contains('Led Zeppelin'));
+      expect(
+        notes,
+        isNot(contains('No query results were produced during research.')),
+      );
+      expect(result.toolCalls, hasLength(10));
+      expect(result.toolCalls.map((c) => c.tool).toSet(), {'runQuery'});
+      expect(result.confidence, 'high');
+    });
+
+    test('answers with low confidence and skips synthesis when no query '
+        'ran', () async {
+      final synthesisRequests = <ModelRequest>[];
+      defineEndlessModel(
+        'fake/endless-exploring',
+        (turn) => ToolRequest(ref: 't$turn', name: 'listTables', input: {}),
+        synthesisRequests,
+      );
+
+      final result = await agentFor(
+        'fake/endless-exploring',
+      ).research('What artists are in the database?');
+
+      expect(synthesisRequests, isEmpty);
+      expect(
+        result.answer,
+        "I couldn't finish researching this question within the allowed "
+        'steps. Try asking something more specific.',
+      );
+      expect(result.sources, isEmpty);
+      expect(result.confidence, 'low');
+      expect(result.toolCalls, hasLength(10));
+      expect(result.toolCalls.first.tool, 'listTables');
+    });
+  });
+
   group('ResearchAgent failures', () {
     test('throws the model\'s GenkitException when the model fails', () async {
       ai.defineModel(

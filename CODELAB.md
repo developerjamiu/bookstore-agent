@@ -11,7 +11,7 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 - Defining typed schemas with Schemantic for tool inputs and structured output
 - Creating Genkit tools with `ai.defineTool()`
 - Building an agentic flow with a tool-calling loop and `maxTurns`
-- Splitting the work into two model calls: one that uses tools, one that returns structured output
+- Getting a structured JSON answer from the same model call that uses the tools
 - Making the agent admit when it can't answer, instead of inventing one
 - Wiring everything together with constructor dependency injection
 
@@ -107,25 +107,25 @@ The agent decides which tool to call, in what order, and when to stop. For this 
 
 The model (Gemini) chooses every step. Your code only provides the tools.
 
-After the loop, a second model call turns the query results into a structured answer with the text, the SQL behind it and a confidence level. If no query ran, for example for an off-topic question like "What is the weather today?", the agent skips that call and replies with low confidence.
+When it has what it needs, the model replies with a structured answer: the text, the SQL behind it and a confidence level. If no query ran, for example for an off-topic question like "What is the weather today?", the answer gets low confidence.
 
 What happens when the app sends a question (errors left out):
 
 ```mermaid
 flowchart TD
     Q["Flutter app sends a question"] --> R["routes/research.dart<br/>POST /api/research"]
-    R --> P1["Phase 1: research<br/>Gemini picks tools, up to 10 turns"]
-    P1 <-->|"asks for a tool, gets the result"| T["Your tools, run by Genkit<br/>listTables, describeTable, runQuery"]
-    P1 --> D{"Did it call runQuery?"}
-    D -- No --> L["Reply directly<br/>with low confidence"]
-    D -- Yes --> P2["Phase 2: synthesis<br/>Gemini writes a ResearchOutput"]
+    R --> G["research_agent.dart<br/>one generate call, up to 10 turns"]
+    G <-->|"asks for a tool, gets the result"| T["Your tools, run by Genkit<br/>listTables, describeTable, runQuery"]
+    G -->|"replies with a ResearchOutput"| D{"Did it call runQuery?"}
+    D -- No --> L["Answer with low confidence"]
+    D -- Yes --> K["Answer as the model wrote it"]
     L --> A["JSON back to the app<br/>answer, sources, confidence, tool trace"]
-    P2 --> A
+    K --> A
 ```
 
 Before any question arrives, `bin/server.dart` starts the server. It opens the database, creates Genkit and uses `agent/setup.dart` to build the tools and the agent once.
 
-You'll build it bottom-up: schemas, tools, message helpers, the agent, then the wiring.
+You'll build it bottom-up: schemas, tools, a message helper, the agent, then the wiring.
 
 ---
 
@@ -476,9 +476,9 @@ class RunQueryTool {
 
 ---
 
-## Step 3: Build the Message Helpers
+## Step 3: Build the Message Helper
 
-While the agent works, Genkit records everything in a conversation: the question, each tool the model asks for, and each result your tools return. The agent you build in Step 4 needs two things from that conversation, so you'll write a helper for each.
+While the agent works, Genkit records everything in a conversation: the question, each tool the model asks for, and each result your tools return. The app shows which tools the agent called, so you'll write a helper that lists them.
 
 Create `packages/dart_server/lib/src/utils/message_helpers.dart`:
 
@@ -515,79 +515,9 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
   }
   return calls;
 }
-
-/// Builds the notes Phase 2 turns into an answer.
-///
-/// Keeps only `runQuery` results, each under the SQL that produced it,
-/// then adds the model's own summary.
-///
-/// ```
-/// [Query: SELECT Name FROM artists LIMIT 3]
-/// [{"Name":"AC/DC"},{"Name":"Led Zeppelin"},{"Name":"Queen"}]
-///
-/// [Agent summary]
-/// The database contains 15 artists.
-/// ```
-String buildResearchNotes(GenerateResult response) {
-  final buffer = StringBuffer();
-
-  for (final message in response.messages) {
-    if (message.role == Role.tool) {
-      for (final part in message.content) {
-        final toolResponsePart = part.toolResponsePart;
-        if (toolResponsePart == null) continue;
-        final toolResponse = toolResponsePart.toolResponse;
-        if (toolResponse.name != 'runQuery') continue;
-        final output = toolResponse.output;
-        if (output == null) continue;
-
-        final sql = _findQueryForResponse(response.messages, toolResponse);
-        if (sql != null) buffer.writeln('[Query: $sql]');
-        buffer.writeln(output is String ? output : jsonEncode(output));
-        buffer.writeln();
-      }
-    }
-  }
-
-  final modelSummary = response.text;
-  if (modelSummary.isNotEmpty) {
-    buffer.writeln('[Agent summary]');
-    buffer.writeln(modelSummary);
-  }
-
-  final result = buffer.toString();
-  if (result.trim().isEmpty) {
-    return 'No query results were produced during research.';
-  }
-  return result;
-}
-
-String? _findQueryForResponse(
-  List<Message> messages,
-  ToolResponse toolResponse,
-) {
-  for (final message in messages) {
-    for (final part in message.content) {
-      final request = part.toolRequestPart;
-      if (request == null) continue;
-      if (request.toolRequest.ref == toolResponse.ref &&
-          request.toolRequest.name == 'runQuery') {
-        if (request.toolRequest.input case {'sql': final String sql}) {
-          return sql;
-        }
-        return null;
-      }
-    }
-  }
-  return null;
-}
 ````
 
-What each function does:
-
-- `extractToolCalls` lists the tools the model called. The app shows them as the agent trace.
-- `buildResearchNotes` collects the query results, each with its SQL. Step 4 uses them to write the answer.
-- `_findQueryForResponse` helps `buildResearchNotes` find the SQL for each result.
+`extractToolCalls` goes through the conversation and lists each tool the model called, with its input. The app shows this list as the agent trace.
 
 **Verify:** `dart analyze` prints `No issues found!`
 
@@ -595,7 +525,7 @@ What each function does:
 
 ## Step 4: Build the Research Agent
 
-Now put the pieces together. The agent uses your tools to research a question (Phase 1), then writes the answer from the notes your helpers build (Phase 2).
+Now put the pieces together. In one call, the agent gives Gemini your tools and asks for the answer in the `ResearchOutput` shape from Step 1.
 
 Create `packages/dart_server/lib/src/agent/research_agent.dart`:
 
@@ -611,7 +541,7 @@ import '../schemas/table_name_input.dart';
 import '../utils/message_helpers.dart';
 
 class ResearchAgent {
-  static const _researchPrompt =
+  static const _prompt =
       'You are a database analyst agent. You can ONLY answer questions '
       'by querying the music store database. Never use your own knowledge. '
       'You do NOT know the database schema, so you must discover it using '
@@ -624,7 +554,16 @@ class ResearchAgent {
       '2. Call describeTable on relevant tables to understand columns and joins.\n'
       '3. Write and run SQL queries to find the answer.\n'
       '4. If a query returns unexpected results, try a different approach.\n'
-      '5. If the question cannot be answered with the available data, say so.\n\n'
+      '5. If the question cannot be answered with the available data, say so.\n'
+      '6. As soon as your query results answer the question, stop calling '
+      'tools and reply.\n\n'
+      'When you are done, reply with:\n'
+      '- answer: a clear answer that interprets the query results. When '
+      'listing items such as tracks, name each distinct item once and give '
+      'a count when it appears more than once.\n'
+      '- sources: the SELECT statements that produced the key results.\n'
+      '- confidence: "high" if the query results clearly answer the '
+      'question, "medium" if partially, "low" if the data was not found.\n\n'
       'NEVER answer from your own knowledge. All answers must come from query results.';
 
   static const _maxTurns = 10;
@@ -632,18 +571,6 @@ class ResearchAgent {
   static const _outOfTurnsAnswer =
       "I couldn't finish researching this question within the allowed "
       'steps. Try asking something more specific.';
-
-  static const _synthesisPrompt =
-      'You are a database analyst. Using ONLY the research notes below, '
-      'produce a structured answer to the user\'s question.\n\n'
-      'Rules:\n'
-      '- Set confidence to "high" if the query results clearly answer the '
-      'question, "medium" if partially, "low" if the data was not found.\n'
-      '- In the sources array, include the SQL queries from the notes '
-      'that produced the key results (the SELECT statements).\n'
-      '- Write a clear, natural-language answer that interprets the data.\n'
-      '- When listing items such as tracks, name each distinct item once and '
-      'give a count when it appears more than once.';
 
   final Genkit _ai;
   final ModelRef<GeminiOptions> _model;
@@ -669,57 +596,28 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    final research = await _runResearchPhase(question);
-    final toolCalls = extractToolCalls(research.messages);
+    // One call: the model uses the tools as often as it needs, up to
+    // _maxTurns times, then replies in the ResearchOutput shape.
+    final response = await _ai.generate(
+      model: _model,
+      system: _prompt,
+      prompt: question,
+      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
+      outputSchema: ResearchOutput.$schema,
+      maxTurns: _maxTurns,
+    );
+    _throwIfFailed(response);
+    final toolCalls = extractToolCalls(response.messages);
 
-    // No query ran, so nothing came from the database: answer with low
-    // confidence. That covers out-of-scope questions and an agent that ran
-    // out of turns before querying.
-    if (!toolCalls.any((call) => call.tool == 'runQuery')) {
+    // The model hit the turn limit before it wrote an answer.
+    if (response.finishReason == FinishReason.aborted) {
       return ResearchResult(
-        answer: research.text.isNotEmpty ? research.text : _outOfTurnsAnswer,
+        answer: _outOfTurnsAnswer,
         sources: const [],
         confidence: 'low',
         toolCalls: toolCalls,
       );
     }
-
-    final notes = buildResearchNotes(research);
-    final synthesis = await _runSynthesisPhase(question, notes);
-    return ResearchResult(
-      answer: synthesis.answer,
-      sources: synthesis.sources,
-      confidence: synthesis.confidence,
-      toolCalls: toolCalls,
-    );
-  }
-
-  /// Phase 1: the model calls tools until it can answer, up to
-  /// [_maxTurns] times. Hitting the limit doesn't throw. Genkit returns
-  /// everything that happened so far.
-  Future<GenerateResult> _runResearchPhase(String question) async {
-    final response = await _ai.generate(
-      model: _model,
-      system: _researchPrompt,
-      prompt: question,
-      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
-      maxTurns: _maxTurns,
-    );
-    _throwIfFailed(response);
-    return response;
-  }
-
-  Future<ResearchOutput> _runSynthesisPhase(
-    String question,
-    String notes,
-  ) async {
-    final response = await _ai.generate(
-      model: _model,
-      system: _synthesisPrompt,
-      prompt: 'Question: $question\n\nResearch notes:\n$notes',
-      outputSchema: ResearchOutput.$schema,
-    );
-    _throwIfFailed(response);
 
     // A reply that does not match the schema comes back as an error on the
     // result instead of a throw. Fail here so the route answers 500.
@@ -730,7 +628,15 @@ class ResearchAgent {
         cause: response.cause,
       );
     }
-    return output;
+
+    // No query ran, so nothing in the answer came from the database.
+    final ranQuery = toolCalls.any((call) => call.tool == 'runQuery');
+    return ResearchResult(
+      answer: output.answer,
+      sources: ranQuery ? output.sources : const [],
+      confidence: ranQuery ? output.confidence : 'low',
+      toolCalls: toolCalls,
+    );
   }
 
   /// Throws if the model call failed.
@@ -752,15 +658,15 @@ class ResearchAgent {
 
 How it works:
 
-- **The prompt:** `_researchPrompt` tells the model it doesn't know the database and must answer only from query results. That is what makes it explore.
-- **Phase 1:** `_runResearchPhase` makes one `generate` call with your three tools. Gemini keeps calling tools until it can answer, up to 10 times.
-- **No query, no Phase 2:** if the model never called `runQuery`, nothing came from the database. The agent returns the model's reply with `low` confidence. That is how a question the database can't answer, like "What is the weather today?", gets a polite refusal.
-- **Phase 2:** `_runSynthesisPhase` sends the notes to Gemini with `outputSchema`, so the answer comes back as a `ResearchOutput`.
+- **The prompt:** `_prompt` tells the model it doesn't know the database, must answer only from query results, and should stop calling tools once it can answer.
+- **One call:** `generate` gets your three tools and `outputSchema`. Gemini calls tools as often as it needs, up to 10 times, then replies as a `ResearchOutput`.
+- **Turn limit:** if Gemini runs out of turns before answering, the agent says it couldn't finish instead of guessing.
+- **No query, low confidence:** if the model never called `runQuery`, nothing came from the database, so the answer gets `low` confidence and no sources. That is how a question the database can't answer, like "What is the weather today?", gets a polite refusal.
 - **Errors:** `_throwIfFailed` turns a failed model call into an error, which the route sends back as an HTTP error in Step 6.
 
 `call()` wraps `research` in a Genkit flow, the function the route will run.
 
-> **Why not one call?** On Gemini, using tools and replying as JSON in the same call is still a preview feature. Two calls keep each job simple: one does the research, the other writes the answer.
+> **Note:** On Gemini, using tools and replying as JSON in the same call is a preview feature for Gemini 3 and later models.
 
 **Verify:** `dart analyze` prints `No issues found!`
 
@@ -935,8 +841,8 @@ You now have a working agent that answers from real query results.
 | -------------------- | --------------------------------------------------------------- |
 | **5 schemas**        | Define typed data shapes for tool inputs and agent output       |
 | **3 tools**          | Explore a database: list tables, describe schema, run queries   |
-| **Message helpers**  | Extract tool calls and build research notes from conversations  |
-| **Research agent**   | Two phases: a tool loop, then a structured answer               |
+| **Message helper**   | List the tools the agent called, for the app's trace            |
+| **Research agent**   | One call: a tool loop that ends in a structured answer          |
 | **Composition root** | Wire all dependencies together                                  |
 | **Route handler**    | Connect the agent flow to the HTTP endpoint                     |
 

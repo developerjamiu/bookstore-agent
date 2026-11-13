@@ -18,10 +18,13 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
       final toolRequestPart = part.toolRequestPart;
       if (toolRequestPart == null) continue;
       final request = toolRequestPart.toolRequest;
+      final input = request.input;
       calls.add(
         ToolCall(
           tool: request.name,
-          input: jsonEncode(request.input ?? const <String, dynamic>{}),
+          // Models sometimes send null or a string such as "NULL" for a
+          // tool with no input. Record anything but an object as "{}".
+          input: jsonEncode(input is Map ? input : const <String, dynamic>{}),
         ),
       );
     }

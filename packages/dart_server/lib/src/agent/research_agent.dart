@@ -18,7 +18,7 @@ class ResearchAgent {
       '- describeTable: see the columns and foreign keys of a table\n'
       '- runQuery: execute a read-only SQL SELECT query\n\n'
       'Strategy:\n'
-      '1. ALWAYS start by calling listTables — every question, no exceptions.\n'
+      '1. Use listTables to discover what tables exist.\n'
       '2. Call describeTable on relevant tables to understand columns and joins.\n'
       '3. Write and run SQL queries to find the answer.\n'
       '4. If a query returns unexpected results, try a different approach.\n'

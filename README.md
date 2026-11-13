@@ -86,7 +86,7 @@ music-store-agent/
 │   │   ├── lib/src/
 │   │   │   ├── agent/
 │   │   │   │   ├── research_agent.dart  # Agent: tool loop + JSON answer
-│   │   │   │   └── setup.dart           # Composition root (DI wiring)
+│   │   │   │   └── setup.dart           # Creates the tools and the agent
 │   │   │   ├── tools/
 │   │   │   │   ├── list_tables.dart     # Tool: discover database tables
 │   │   │   │   ├── describe_table.dart  # Tool: inspect table schema
@@ -293,7 +293,7 @@ it couldn't finish.
 | **Tools** — `list_tables.dart`, `describe_table.dart`, `run_query.dart`                                                         | Write the logic AND register each tool with Genkit via `ai.defineTool()`      |
 | **Message helpers** — `message_helpers.dart`                                                                                    | List the tools the agent called, for the app's trace                          |
 | **Agent** — `research_agent.dart`                                                                                               | Tool-calling loop that ends in a structured JSON answer                       |
-| **Setup** — `setup.dart`                                                                                                        | Wire everything together in the composition root                              |
+| **Setup** — `setup.dart`                                                                                                        | Create the tools and the agent, and connect them                                |
 | **Route update** — `research.dart`                                                                                              | Replace the placeholder response with the real agent flow                     |
 | **Agent tests** — `research_agent_test.dart`                                                                                    | Test the agent using `ai.defineModel()` with fake responses                   |
 | **Tool tests** — `list_tables_test.dart`, `describe_table_test.dart`, `run_query_test.dart`                                     | Test each tool's logic method against a real in-memory database               |

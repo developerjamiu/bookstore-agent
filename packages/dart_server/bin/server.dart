@@ -8,9 +8,7 @@ import 'package:dart_server/src/routes/research.dart';
 Future<void> main() async {
   final routes = ResearchRoutes();
 
-  // Middleware only runs for requests that match a route, so the router is
-  // mounted for every method and path. That way cors() also answers
-  // preflights and adds its headers to 404 and 405 responses.
+  // Mounted for every path so cors() also reaches preflights and 404/405s.
   final app = RelicApp()
     ..use('/', cors())
     ..use('/', logRequests())

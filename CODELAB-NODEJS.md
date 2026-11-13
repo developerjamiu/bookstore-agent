@@ -31,12 +31,12 @@ The following files form the Node agent. On **`main`** they are already present 
 import { z } from 'genkit';
 
 export const ToolCallSchema = z.object({
-  tool: z.string().describe('Name of the tool that was called'),
-  input: z.string().describe('JSON-encoded input passed to the tool'),
+  tool: z.string().describe('The name of the tool'),
+  input: z.string().describe('What the agent sent to the tool, as JSON text'),
 });
 
 export const ResearchOutputSchema = z.object({
-  answer: z.string().describe('The synthesized answer to the question'),
+  answer: z.string().describe('The answer to the question'),
   sources: z.array(z.string()).describe('SQL queries used to produce the answer'),
   confidence: z
     .enum(['low', 'medium', 'high'])
@@ -44,12 +44,12 @@ export const ResearchOutputSchema = z.object({
 });
 
 export const ResearchResultSchema = z.object({
-  answer: z.string().describe('The synthesized answer to the question'),
+  answer: z.string().describe('The answer to the question'),
   sources: z.array(z.string()).describe('SQL queries used to produce the answer'),
   confidence: z
     .enum(['low', 'medium', 'high'])
     .describe('How confident the agent is in the answer'),
-  toolCalls: z.array(ToolCallSchema).describe('Tools the agent invoked while researching'),
+  toolCalls: z.array(ToolCallSchema).describe('The tools the agent called, in order'),
 });
 
 export type ResearchResult = z.infer<typeof ResearchResultSchema>;
@@ -168,8 +168,8 @@ export function createRunQueryTool(ai: Genkit, db: Database) {
     {
       name: 'runQuery',
       description:
-        'Execute a read-only SQL SELECT query and return the results ' +
-        'as a formatted table. Returns up to ' +
+        'Execute a read-only SQL SELECT query and return the rows ' +
+        'as JSON. Returns up to ' +
         MAX_ROWS +
         ' rows. Only SELECT statements are allowed.',
       inputSchema: z.object({
@@ -325,7 +325,7 @@ import { buildResearchNotes, extractToolCalls } from '../utils/messageHelpers.js
 
 const RESEARCH_PROMPT =
   'You are a database analyst agent. You can ONLY answer questions ' +
-  'by querying the music store database — never use your own knowledge. ' +
+  'by querying the music store database. Never use your own knowledge. ' +
   'You do NOT know the database schema, so you must discover it using ' +
   'the tools provided:\n' +
   '- listTables: discover what tables exist\n' +
@@ -583,7 +583,7 @@ server.listen(port, host, () => {
   console.log('Try it:');
   console.log(`  curl -s http://localhost:${port}/api/research \\`);
   console.log('    -H "Content-Type: application/json" \\');
-  console.log('    -d \'{"question":"Which genre has the most tracks?"}\' | jq');
+  console.log('    -d \'{"question":"Which genre has the most tracks?"}\'');
   console.log('');
 });
 

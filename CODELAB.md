@@ -1,45 +1,47 @@
 # Build Your First AI Agent with Genkit
 
-Learn to build a Dart server that uses Genkit to create an autonomous AI agent. The agent explores a music store database by choosing which tools to call, writing SQL queries, and answering natural-language questions — all without being told what to do step by step.
+In this codelab, you'll build your first AI agent with Genkit and Dart. Ask it a question about a store's database, and it works out the answer itself: it decides which tables to look at, writes its own SQL, and explains what it found, with the queries to prove it.
 
-This is not a chatbot. It's an **agent** — an LLM that sits in a loop, picks tools, observes results, and decides what to do next.
+That is what makes it an **agent** rather than a chatbot. A chatbot answers from what it already knows. An agent takes actions, here calling tools that read the database, then looks at each result and decides what to do next, until it has an answer.
+
+[Genkit](https://genkit.dev/) is Google's open-source framework for AI apps. It sends your prompts to a model such as Gemini and runs the tools the model asks for.
 
 **What you'll learn:**
 
 - Defining typed schemas with Schemantic for tool inputs and structured output
 - Creating Genkit tools with `ai.defineTool()`
 - Building an agentic flow with a tool-calling loop and `maxTurns`
-- Working around Gemini's limitation of tools + outputSchema with two-phase generate
-- Wiring everything together with constructor dependency injection
+- Getting a structured JSON answer from a model that uses tools
+- Making the agent admit when it can't answer, instead of inventing one
 
-**Time:** ~30 minutes
+**Time:** 45 to 60 minutes
 
 **Prerequisites:**
 
-- [Dart SDK](https://dart.dev/get-dart) >= 3.11
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) >= 3.27
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) with Dart 3.12 or later (check with `flutter --version`)
 - A Google AI API key ([get one free](https://aistudio.google.com/apikey))
+- An iOS Simulator (Xcode) or Android emulator (Android Studio) to run the Flutter app
 
 ---
 
 ## Step 0: Get the Starter Project
 
 ```sh
-git clone git@github.com:developerjamiu/music-store-agent.git
+git clone https://github.com/developerjamiu/music-store-agent.git
 cd music-store-agent
 git checkout starter
-dart pub get
+flutter pub get
 ```
 
 ### Explore what you have
 
-The starter project includes a **complete Flutter app** and a **Dart server skeleton**. The server currently returns placeholder data — your job is to build the AI agent that powers it.
+The starter has a **complete Flutter app** and a **Dart server** that returns placeholder data. You'll replace the placeholder with an AI agent.
 
-The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP server framework. Some of it is pre-built scaffolding you won't change: `packages/dart_server/lib/src/middleware/cors.dart` adds CORS headers so browsers can call the API, and `packages/dart_server/lib/src/utils/request_helpers.dart` parses JSON bodies and builds JSON responses.
+The server uses [Relic](https://docs.dartrelic.dev/), a high-performance, type-safe Dart web server built by the Serverpod team. Two files in `packages/dart_server/lib/src` are pre-built and stay as they are: `middleware/cors.dart` lets browsers call the API, and `utils/request_helpers.dart` reads and writes JSON and turns Genkit errors into HTTP errors.
 
 **Browse the database:**
 
-Open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) extension. You'll see 9 tables: artists, albums, tracks, genres, customers, invoices, invoice_lines, playlists, and playlist_tracks. This is the data your agent will explore.
+Optional: open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) extension. You'll see 9 tables: artists, albums, tracks, genres, customers, invoices, invoice_lines, playlists, and playlist_tracks.
 
 **Run the starter server:**
 
@@ -47,121 +49,118 @@ Open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite View
 dart run packages/dart_server/bin/server.dart
 ```
 
-The server listens on port 8080 because the Flutter client calls `http://localhost:8080` (`http://10.0.2.2:8080` on the Android emulator). To listen on another port, set `PORT`, for example `PORT=8081 dart run packages/dart_server/bin/server.dart`. The client still calls 8080, so use another port only for curl testing.
+It listens on port 8080, where the Flutter app expects it. Leave it running and open a second terminal for the next command.
 
 **Test it with curl:**
 
 ```sh
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}' | jq
+  -d '{"question":"What artists are in the database?"}'
 ```
 
-You'll see:
+You'll see this JSON (formatted here for easier reading):
 
 ```json
 {
-  "answer": "This is a placeholder. Complete the codelab to power this with a real AI agent...",
+  "answer": "This is a placeholder. Complete the codelab to power this with a real AI agent that explores the music store database!",
   "sources": [],
   "confidence": "low",
   "toolCalls": []
 }
 ```
 
-**Run the Flutter app** (in a second terminal):
+**Run the Flutter app.** Start an iOS Simulator or Android emulator first, then in another terminal run:
 
 ```sh
 cd packages/client
 flutter run
 ```
 
-Type a question and tap **Research**. You'll see the same placeholder. By the end of this codelab, the same UI will show real AI-generated answers with SQL queries and a full tool trace.
+Type a question and tap the send arrow. You'll see the same placeholder. By the end of this codelab, the same screen will show real answers, the SQL queries behind them, and the agent trace.
 
 ---
 
 ## How the Agent Works
 
-When a user asks _"Who is the top spending customer?"_, the agent doesn't know the answer - and it doesn't know the database schema either. It has to figure both out on its own.
+When a user asks _"Who is the top spending customer and what did they buy?"_, the agent doesn't know the answer, and it doesn't know the database schema either. It has to figure out both on its own.
 
-To do this, it uses three tools that let it explore the database:
+To do this, it uses three tools. A tool is a Dart function plus a name, a description and an input schema, which the model reads to pick a tool. The model can't run code: it asks for a tool by name, with arguments, and Genkit runs your function and sends back the result.
 
 | Tool            | What it does                                          | Input      | Output              |
 | --------------- | ----------------------------------------------------- | ---------- | ------------------- |
 | `listTables`    | Discovers what tables exist in the database           | None       | List of table names |
 | `describeTable` | Shows the columns, types, and foreign keys of a table | Table name | Column definitions  |
-| `runQuery`      | Executes a read-only SQL SELECT query                 | SQL string | JSON rows           |
+| `runQuery`      | Executes a read-only SQL SELECT query                 | SQL string | Up to 50 JSON rows  |
 
-The agent decides which tool to call, in what order, and when to stop. A typical conversation looks like this:
+The agent decides which tool to call, in what order, and when to stop. For this question, a typical run looks like this:
 
-1. Agent calls `listTables` - sees `customers`, `invoices`, `invoice_lines`, `tracks`, etc.
-2. Agent calls `describeTable("customers")` - learns the column names and types
-3. Agent calls `describeTable("invoices")` - sees `CustomerId` foreign key, understands the join
-4. Agent calls `describeTable("invoice_lines")` - sees how individual purchases connect
-5. Agent calls `runQuery("SELECT ... JOIN ... GROUP BY ... ORDER BY ... LIMIT 1")` - finds the top spender
-6. Agent calls `runQuery("SELECT ... WHERE CustomerId = ...")` - finds what they bought
-7. Agent decides it has enough and stops
+1. Agent calls `listTables`: sees `customers`, `invoices`, `invoice_lines`, `tracks` and more
+2. Agent calls `describeTable("customers")`: learns the column names and types
+3. Agent calls `describeTable("invoices")`: sees the `CustomerId` foreign key, so it knows how to join
+4. Agent calls `describeTable("invoice_lines")`: sees how individual purchases connect
+5. Agent calls `describeTable("tracks")`: finds where the track names live
+6. Agent calls `runQuery("SELECT ... JOIN ... GROUP BY ... ORDER BY ... LIMIT 1")`: finds the top spender
+7. Agent calls `runQuery("SELECT ... WHERE CustomerId = ...")`: finds what they bought
+8. Agent decides it has enough and stops
 
-This loop - think, act, observe, repeat - is what makes it an agent. The model chooses every step.
+The model (Gemini) chooses every step. Your code only provides the tools.
 
-After the tool loop finishes, a second LLM call takes the query results and produces a structured JSON answer with the text, sources (the SQL queries), and a confidence level. This two-call approach is needed because Gemini doesn't support tools and structured output in the same request.
+When it has what it needs, the model replies with a structured answer: the text, the SQL behind it and a confidence level. If no query ran, for example for an off-topic question like "What is the weather today?", the answer gets low confidence.
 
-Here's what you'll build to make this work:
+What happens when the app sends a question (errors left out):
 
-```
-User question
-    |
-bin/server.dart (opens DB, creates Genkit, starts Relic)
-    |
-routes/research.dart (receives POST, calls the agent flow)
-    |
-agent/setup.dart (wires tools + agent together)
-    |
-agent/research_agent.dart
-    |-- Phase 1: tool-calling loop (maxTurns: 10)
-    |   |-- listTables
-    |   |-- describeTable
-    |   |-- runQuery
-    |   (model picks which tool, sees result, picks again)
-    |
-    |-- Phase 2: synthesis (outputSchema: ResearchOutput)
-    |   (structured JSON from the research notes)
-    |
-    v
-Flutter UI (renders answer + SQL sources + agent trace)
+```mermaid
+flowchart TD
+    Q["Flutter app sends a question"] --> R["routes/research.dart<br/>POST /api/research"]
+    R --> G["research_agent.dart<br/>generate with your tools, up to 10 turns"]
+    G <-->|"asks for a tool, gets the result"| T["Your tools, run by Genkit<br/>listTables, describeTable, runQuery"]
+    G -->|"replies with a ResearchOutput"| D{"Did it call runQuery?"}
+    D -- No --> L["Answer with low confidence"]
+    D -- Yes --> K["Answer as the model wrote it"]
+    L --> A["JSON back to the app<br/>answer, sources, confidence, tool trace"]
+    K --> A
 ```
 
-Each component has a clear role, and you'll build them bottom-up: schemas first, then tools, then the agent, then the wiring.
+Before any question arrives, `bin/server.dart` starts the server. It opens the database, creates Genkit and uses `agent/setup.dart` to build the tools and the agent once.
+
+You'll build it bottom-up: schemas, tools, a message helper, the agent, then the wiring.
 
 ---
 
 ## Step 1: Define the Schemas
 
-Schemas define the shape of data flowing in and out of your tools and agent. We use [Schemantic](https://pub.dev/packages/schemantic) — a code-generation package that produces typed Dart classes from abstract schema definitions.
+A schema defines the shape of some data, such as what a tool accepts or what the agent returns.
+
+In this step you'll:
+
+1. **Create five schema files.** Each is an abstract class whose name starts with `$`, like `$TableNameInput`. Gemini reads every `description`, so write each one as an instruction that says what the field means. When one schema uses another, refer to it by its `$` name, like `List<$ToolCall>`.
+2. **Run `build_runner`.** [Schemantic](https://pub.dev/packages/schemantic), a code generator, turns each `$` class into a real class (`TableNameInput`) in a `.g.dart` file, with `fromJson`, `toJson` and the `$schema` that Genkit sends to the model.
 
 ### Tool input schemas
 
-Create `packages/dart_server/lib/src/schemas/table_name_input.dart`:
+Create `packages/dart_server/lib/src/schemas/table_name_input.dart`, the input for `describeTable` (the table to look at):
 
 ```dart
 import 'package:schemantic/schemantic.dart';
 
 part 'table_name_input.g.dart';
 
-@Schema(description: 'Input specifying a database table to inspect')
+@Schema(description: 'Which table to look at')
 abstract class $TableNameInput {
   @StringField(description: 'The name of the table, as returned by listTables.')
   String get table;
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/sql_query_input.dart`:
+Create `packages/dart_server/lib/src/schemas/sql_query_input.dart`, the input for `runQuery` (the SQL to run):
 
 ```dart
 import 'package:schemantic/schemantic.dart';
 
 part 'sql_query_input.g.dart';
 
-@Schema(description: 'A SQL query to execute against the database')
+@Schema(description: 'The SQL query to run')
 abstract class $SqlQueryInput {
   @StringField(
     description:
@@ -174,33 +173,33 @@ abstract class $SqlQueryInput {
 
 ### Agent output schemas
 
-Create `packages/dart_server/lib/src/schemas/tool_call.dart`:
+Create `packages/dart_server/lib/src/schemas/tool_call.dart`, which records one tool the agent called and what it sent. The app lists these so you can watch the agent work:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
 
 part 'tool_call.g.dart';
 
-@Schema(description: 'A tool invocation made by the research agent')
+@Schema(description: 'A tool the agent called')
 abstract class $ToolCall {
-  @StringField(description: 'Name of the tool that was called')
+  @StringField(description: 'The name of the tool')
   String get tool;
 
-  @StringField(description: 'JSON-encoded input passed to the tool')
+  @StringField(description: 'What the agent sent to the tool, as JSON text')
   String get input;
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/research_output.dart`:
+Create `packages/dart_server/lib/src/schemas/research_output.dart`, the answer Gemini writes from the query results:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
 
 part 'research_output.g.dart';
 
-@Schema(description: 'Synthesized answer produced by the research agent')
+@Schema(description: 'The answer Gemini writes from the query results')
 abstract class $ResearchOutput {
-  @StringField(description: 'The synthesized answer to the question')
+  @StringField(description: 'The answer to the question')
   String get answer;
 
   @Field(description: 'SQL queries used to produce the answer')
@@ -214,7 +213,7 @@ abstract class $ResearchOutput {
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/research_result.dart`:
+Create `packages/dart_server/lib/src/schemas/research_result.dart`, what the server sends back to the app (the answer plus the tools the agent called):
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -223,9 +222,9 @@ import 'tool_call.dart';
 
 part 'research_result.g.dart';
 
-@Schema(description: 'Final result returned by the research agent flow')
+@Schema(description: 'The answer the server sends back to the app')
 abstract class $ResearchResult {
-  @StringField(description: 'The synthesized answer to the question')
+  @StringField(description: 'The answer to the question')
   String get answer;
 
   @Field(description: 'SQL queries used to produce the answer')
@@ -237,33 +236,35 @@ abstract class $ResearchResult {
   )
   String get confidence;
 
-  @Field(description: 'Tools the agent invoked while researching')
+  @Field(description: 'The tools the agent called, in order')
   List<$ToolCall> get toolCalls;
 }
 ```
 
-> **Why two output schemas?** `ResearchOutput` is what the LLM produces (via `outputSchema`). `ResearchResult` is what the flow returns — it adds `toolCalls`, which the agent code assembles from the conversation history, not the LLM.
-
 ### Generate the code
+
+Run the generator from the server package (`schemantic_builder` is already a dev dependency):
 
 ```sh
 cd packages/dart_server
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 ```
 
-This generates a `.g.dart` file next to each schema with constructors, `fromJson`, `toJson`, and a `$schema` constant for use with Genkit.
-
-**Verify:** `dart analyze` should show no errors.
+**Verify:** `ls lib/src/schemas` shows five `.g.dart` files, and `dart analyze` prints `No issues found!`. If it reports a URI "hasn't been generated", rerun build_runner.
 
 ---
 
 ## Step 2: Build the Database Tools
 
-Each tool follows the same pattern: a class with constructor DI, a `call()` method that registers with Genkit, and a public logic method that's testable without Genkit.
+Create the three tools below. Each is a class with three parts:
+
+- A constructor that receives `ai` and `db`
+- `define()`, which registers the tool with Genkit
+- A plain method (`list`, `describe`, `query`) that holds the logic
 
 ### ListTablesTool
 
-Create `packages/dart_server/lib/src/tools/list_tables.dart`:
+Create `packages/dart_server/lib/src/tools/list_tables.dart`, which lets the agent discover the tables:
 
 ````dart
 import 'package:genkit/genkit.dart';
@@ -277,11 +278,9 @@ class ListTablesTool {
   final Genkit _ai;
   final Database _db;
 
-  ListTablesTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  ListTablesTool({required this._ai, required this._db});
 
-  Tool<void, String> call() {
+  Tool<void, String> define() {
     return _ai.defineTool(
       name: 'listTables',
       description:
@@ -289,7 +288,7 @@ class ListTablesTool {
           'what data is available before writing any queries.',
       inputSchema: SchemanticType.voidSchema(),
       outputSchema: SchemanticType.string(),
-      fn: (_, _) => list(),
+      fn: (_, _) async => .response(await list()),
     );
   }
 
@@ -314,9 +313,11 @@ class ListTablesTool {
 }
 ````
 
+> Notice: a Genkit tool returns its result wrapped in `.response(...)` (short for `ToolResult.response(...)`). Any tool you add later needs the same.
+
 ### DescribeTableTool
 
-Create `packages/dart_server/lib/src/tools/describe_table.dart`:
+Create `packages/dart_server/lib/src/tools/describe_table.dart`, which shows the agent a table's columns and foreign keys:
 
 ````dart
 import 'package:genkit/genkit.dart';
@@ -336,11 +337,9 @@ class DescribeTableTool {
   final Genkit _ai;
   final Database _db;
 
-  DescribeTableTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  DescribeTableTool({required this._ai, required this._db});
 
-  Tool<TableNameInput, String> call() {
+  Tool<TableNameInput, String> define() {
     return _ai.defineTool(
       name: 'describeTable',
       description:
@@ -348,7 +347,7 @@ class DescribeTableTool {
           'to understand the schema before writing a query.',
       inputSchema: TableNameInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => describe(input),
+      fn: (input, _) async => .response(await describe(input)),
     );
   }
 
@@ -399,7 +398,7 @@ class DescribeTableTool {
 
 ### RunQueryTool
 
-Create `packages/dart_server/lib/src/tools/run_query.dart`:
+Create `packages/dart_server/lib/src/tools/run_query.dart`, which runs a read-only `SELECT` and returns up to 50 rows as JSON:
 
 ````dart
 import 'dart:convert';
@@ -421,20 +420,18 @@ class RunQueryTool {
   final Genkit _ai;
   final Database _db;
 
-  RunQueryTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  RunQueryTool({required this._ai, required this._db});
 
-  Tool<SqlQueryInput, String> call() {
+  Tool<SqlQueryInput, String> define() {
     return _ai.defineTool(
       name: 'runQuery',
       description:
-          'Execute a read-only SQL SELECT query and return the results '
-          'as a formatted table. Returns up to $_maxRows rows. Only '
+          'Execute a read-only SQL SELECT query and return the rows '
+          'as JSON. Returns up to $_maxRows rows. Only '
           'SELECT statements are allowed.',
       inputSchema: SqlQueryInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => query(input),
+      fn: (input, _) async => .response(await query(input)),
     );
   }
 
@@ -472,13 +469,15 @@ class RunQueryTool {
 }
 ````
 
-**Verify:** `dart analyze` should show no errors.
+`query` returns SQL errors as text instead of throwing, so the model can read it and fix its SQL.
+
+**Verify:** `dart analyze` prints `No issues found!`
 
 ---
 
-## Step 3: Build the Message Helpers
+## Step 3: Build the Message Helper
 
-When the agent finishes its tool-calling loop, we need to extract two things from the conversation: what tools were called (for the UI trace), and what query results came back (for the synthesis phase).
+While the agent works, Genkit records everything in a conversation: the question, each tool the model asks for, and each result your tools return. The app shows which tools the agent called, so you'll write a helper that lists them.
 
 Create `packages/dart_server/lib/src/utils/message_helpers.dart`:
 
@@ -489,7 +488,7 @@ import 'package:genkit/genkit.dart';
 
 import '../schemas/tool_call.dart';
 
-/// Extracts all tool requests from a conversation as [ToolCall] records.
+/// Lists every tool the model asked for, in order, for the app's trace.
 ///
 /// ```
 /// [ToolCall(tool: "listTables", input: "{}"),
@@ -503,95 +502,29 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
       final toolRequestPart = part.toolRequestPart;
       if (toolRequestPart == null) continue;
       final request = toolRequestPart.toolRequest;
+      final input = request.input;
       calls.add(
         ToolCall(
           tool: request.name,
-          input: jsonEncode(request.input ?? const <String, dynamic>{}),
+          // A tool with no input can arrive as null or "NULL": record "{}".
+          input: jsonEncode(input is Map ? input : const <String, dynamic>{}),
         ),
       );
     }
   }
   return calls;
 }
-
-/// Builds synthesis-ready notes from a completed research response.
-///
-/// Includes only `runQuery` results (not schema exploration output)
-/// paired with the SQL that produced them, plus the agent's summary.
-///
-/// ```
-/// [Query: SELECT Name FROM artists LIMIT 3]
-/// [{"Name":"AC/DC"},{"Name":"Led Zeppelin"},{"Name":"Queen"}]
-///
-/// [Agent summary]
-/// The database contains 15 artists.
-/// ```
-String buildResearchNotes(GenerateResponseHelper response) {
-  final buffer = StringBuffer();
-
-  for (final message in response.messages) {
-    if (message.role == Role.tool) {
-      for (final part in message.content) {
-        final toolResponsePart = part.toolResponsePart;
-        if (toolResponsePart == null) continue;
-        final toolResponse = toolResponsePart.toolResponse;
-        if (toolResponse.name != 'runQuery') continue;
-        final output = toolResponse.output;
-        if (output == null) continue;
-
-        final sql = _findQueryForResponse(response.messages, toolResponse);
-        if (sql != null) buffer.writeln('[Query: $sql]');
-        buffer.writeln(output is String ? output : jsonEncode(output));
-        buffer.writeln();
-      }
-    }
-  }
-
-  final modelSummary = response.text;
-  if (modelSummary.isNotEmpty) {
-    buffer.writeln('[Agent summary]');
-    buffer.writeln(modelSummary);
-  }
-
-  final result = buffer.toString();
-  if (result.trim().isEmpty) {
-    return 'No query results were produced during research.';
-  }
-  return result;
-}
-
-String? _findQueryForResponse(
-  List<Message> messages,
-  ToolResponse toolResponse,
-) {
-  for (final message in messages) {
-    for (final part in message.content) {
-      final request = part.toolRequestPart;
-      if (request == null) continue;
-      if (request.toolRequest.ref == toolResponse.ref &&
-          request.toolRequest.name == 'runQuery') {
-        final input = request.toolRequest.input;
-        return input?['sql'] as String?;
-      }
-    }
-  }
-  return null;
-}
 ````
 
-> **Why filter out `listTables` and `describeTable` results?** The synthesis phase only needs query results to write its answer. Schema exploration output wastes tokens and can confuse the model.
+`extractToolCalls` goes through the conversation and lists each tool the model called, with its input. The app shows this list as the agent trace.
+
+**Verify:** `dart analyze` prints `No issues found!`
 
 ---
 
 ## Step 4: Build the Research Agent
 
-This is the core of the codelab — the agentic flow with two phases.
-
-**Phase 1 - Research:** The model gets the user's question and three tools. It autonomously decides to call `listTables` first, then `describeTable` on relevant tables, then `runQuery` to fetch data. It loops up to `maxTurns: 10` and stops when it has enough information.
-
-**Phase 2 - Synthesis:** The model gets the query results from phase 1 and produces a structured `ResearchOutput` via `outputSchema`.
-
-> **Why two phases?** Gemini doesn't support `tools` + `outputSchema` in the same API call. This is a known limitation.
+The agent gives Gemini your three tools and asks for the reply in the `ResearchOutput` shape from Step 1.
 
 Create `packages/dart_server/lib/src/agent/research_agent.dart`:
 
@@ -606,32 +539,35 @@ import '../schemas/sql_query_input.dart';
 import '../schemas/table_name_input.dart';
 import '../utils/message_helpers.dart';
 
-class ResearchAgent {
-  static const _researchPrompt =
-      'You are a database analyst agent. You can ONLY answer questions '
-      'by querying the music store database — never use your own knowledge. '
-      'You do NOT know the database schema, so you must discover it using '
-      'the tools provided:\n'
-      '- listTables: discover what tables exist\n'
-      '- describeTable: see the columns and foreign keys of a table\n'
-      '- runQuery: execute a read-only SQL SELECT query\n\n'
-      'Strategy:\n'
-      '1. ALWAYS start by calling listTables — every question, no exceptions.\n'
-      '2. Call describeTable on relevant tables to understand columns and joins.\n'
-      '3. Write and run SQL queries to find the answer.\n'
-      '4. If a query returns unexpected results, try a different approach.\n'
-      '5. If the question cannot be answered with the available data, say so.\n\n'
-      'NEVER answer from your own knowledge. All answers must come from query results.';
+/// A Genkit flow that takes a question and returns a [ResearchResult].
+typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 
-  static const _synthesisPrompt =
-      'You are a database analyst. Using ONLY the research notes below, '
-      'produce a structured answer to the user\'s question.\n\n'
-      'Rules:\n'
-      '- Set confidence to "high" if the query results clearly answer the '
-      'question, "medium" if partially, "low" if the data was not found.\n'
-      '- In the sources array, include the SQL queries from the notes '
-      'that produced the key results (the SELECT statements).\n'
-      '- Write a clear, natural-language answer that interprets the data.';
+class ResearchAgent {
+  static const _prompt =
+      'You are a database analyst. Answer questions ONLY from the results of '
+      'queries you run on the music store database, never from your own '
+      'knowledge.\n\n'
+      'You do not know the database schema. To answer:\n'
+      '1. Use listTables to see what tables exist.\n'
+      '2. Use describeTable on the relevant tables to learn their columns and joins.\n'
+      '3. Write and run SQL queries with runQuery.\n'
+      '4. If a query returns unexpected results, try a different approach.\n'
+      '5. If the data cannot answer the question, say so.\n'
+      '6. As soon as your query results answer the question, stop calling '
+      'tools and reply.\n\n'
+      'In your reply:\n'
+      '- answer: interpret the query results clearly. When listing items such '
+      'as tracks, name each distinct item once and give a count when it '
+      'appears more than once.\n'
+      '- sources: the SELECT statements that produced the key results.\n'
+      '- confidence: "high" if the results clearly answer the question, '
+      '"medium" if partially, "low" if the database cannot answer it.';
+
+  static const _maxTurns = 10;
+
+  static const _outOfTurnsAnswer =
+      "I couldn't finish researching this question within the allowed "
+      'steps. Try asking something more specific.';
 
   final Genkit _ai;
   final ModelRef<GeminiOptions> _model;
@@ -640,18 +576,14 @@ class ResearchAgent {
   final Tool<SqlQueryInput, String> _runQueryTool;
 
   ResearchAgent({
-    required Genkit ai,
+    required this._ai,
     ModelRef<GeminiOptions>? model,
-    required Tool<void, String> listTablesTool,
-    required Tool<TableNameInput, String> describeTableTool,
-    required Tool<SqlQueryInput, String> runQueryTool,
-  }) : _ai = ai,
-       _model = model ?? googleAI.gemini('gemini-2.5-flash'),
-       _listTablesTool = listTablesTool,
-       _describeTableTool = describeTableTool,
-       _runQueryTool = runQueryTool;
+    required this._listTablesTool,
+    required this._describeTableTool,
+    required this._runQueryTool,
+  }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
-  Flow<String, ResearchResult, Never, Never> call() {
+  ResearchFlow define() {
     return _ai.defineFlow(
       name: 'researchFlow',
       inputSchema: SchemanticType.string(),
@@ -661,164 +593,109 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    final researchResponse = await _runResearchPhase(question);
-    final toolCalls = extractToolCalls(researchResponse.messages);
-    final notes = buildResearchNotes(researchResponse);
-
-    final synthesis = await _runSynthesisPhase(question, notes);
-
-    return ResearchResult(
-      answer: synthesis.answer,
-      sources: synthesis.sources,
-      confidence: synthesis.confidence,
-      toolCalls: toolCalls,
-    );
-  }
-
-  Future<GenerateResponseHelper> _runResearchPhase(String question) async {
-    try {
-      return await _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [TextPart(text: _researchPrompt)],
-          ),
-          Message(role: Role.user, content: [TextPart(text: question)]),
-        ],
-        tools: [_listTablesTool, _describeTableTool, _runQueryTool],
-        maxTurns: 10,
-      );
-    } on GenkitException catch (e) {
-      if (!e.message.contains('max turns')) rethrow;
-
-      return _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [
-              TextPart(
-                text:
-                    'You ran out of tool-calling turns. Summarize what you '
-                    'learned from the query results below. Do not call any '
-                    'more tools.',
-              ),
-            ],
-          ),
-          Message(role: Role.user, content: [TextPart(text: question)]),
-        ],
-      );
-    }
-  }
-
-  Future<ResearchOutput> _runSynthesisPhase(
-    String question,
-    String notes,
-  ) async {
+    // The model uses the tools as often as it needs, up to _maxTurns
+    // times, then replies in the ResearchOutput shape.
     final response = await _ai.generate(
       model: _model,
-      messages: [
-        Message(
-          role: Role.system,
-          content: [TextPart(text: _synthesisPrompt)],
-        ),
-        Message(
-          role: Role.user,
-          content: [
-            TextPart(text: 'Question: $question\n\nResearch notes:\n$notes'),
-          ],
-        ),
-      ],
+      system: _prompt,
+      prompt: question,
+      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
       outputSchema: ResearchOutput.$schema,
+      maxTurns: _maxTurns,
     );
+    final toolCalls = extractToolCalls(response.messages);
 
-    return response.output ??
-        ResearchOutput(
-          answer: 'I was unable to produce a structured answer.',
-          sources: const [],
-          confidence: 'low',
-        );
+    // The model hit the turn limit before it wrote an answer.
+    if (response.finishReason == FinishReason.aborted) {
+      return ResearchResult(
+        answer: _outOfTurnsAnswer,
+        sources: const [],
+        confidence: 'low',
+        toolCalls: toolCalls,
+      );
+    }
+
+    // Genkit reports failures in the result instead of throwing.
+    // Throw here so the route answers with an HTTP error.
+    final output = response.output;
+    if (output == null) {
+      final cause = response.cause;
+      if (cause is GenkitException) throw cause;
+      throw GenkitException(
+        response.error?.message ?? 'The model returned no answer.',
+        cause: cause,
+      );
+    }
+
+    // No query ran, so nothing in the answer came from the database.
+    final ranQuery = toolCalls.any((call) => call.tool == 'runQuery');
+    return ResearchResult(
+      answer: output.answer,
+      sources: ranQuery ? output.sources : const [],
+      confidence: ranQuery ? output.confidence : 'low',
+      toolCalls: toolCalls,
+    );
   }
 }
 ```
 
-**Key things to notice:**
+How it works:
 
-- `maxTurns: 10` — the model can call tools up to 10 times before Genkit stops it
-- The catch block handles the "max turns" case gracefully
-- `extractToolCalls` and `buildResearchNotes` come from the helpers you built in Step 4
-- `model` is injectable — tests swap in a fake, production uses Gemini
+- **Tool loop:** Gemini calls tools as often as it needs, up to `_maxTurns` (10) times, then replies as a `ResearchOutput`. Line 6 of the prompt tells it to stop once it can answer.
+- **Turn limit:** if Gemini runs out of turns first, the agent says it couldn't finish instead of guessing.
+- **No query, low confidence:** if the model never called `runQuery`, nothing came from the database, so the answer gets `low` confidence and no sources.
+- **Errors:** Genkit doesn't throw when the model call fails. It returns a result with no `output`. The agent throws instead, so the route in Step 6 can answer with an HTTP error.
+
+`define()` wraps `research` in a Genkit flow, the function the route will run. Its type, `ResearchFlow`, is a `typedef`: a short name for `Flow<String, ResearchResult, Never, Never>`. A question goes in and a `ResearchResult` comes out. Steps 5 and 6 use the short name.
+
+**Verify:** `dart analyze` prints `No issues found!`
 
 ---
 
-## Step 5: Wire Everything in the Composition Root
+## Step 5: Connect the Pieces
 
-The composition root creates all dependencies and wires them together in one place.
-
-Create `packages/dart_server/lib/src/agent/setup.dart`:
+Create `packages/dart_server/lib/src/agent/setup.dart`. It creates the tools and the agent, and hands each one what it needs:
 
 ```dart
 import 'package:genkit/genkit.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-import '../schemas/research_result.dart';
 import '../tools/describe_table.dart';
 import '../tools/list_tables.dart';
 import '../tools/run_query.dart';
 import 'research_agent.dart';
 
-class AISetup {
-  final Genkit _ai;
-  final Database _db;
-
-  AISetup({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
-
-  Flow<String, ResearchResult, Never, Never> call() {
-    final listTablesTool = ListTablesTool(ai: _ai, db: _db);
-    final describeTableTool = DescribeTableTool(ai: _ai, db: _db);
-    final runQueryTool = RunQueryTool(ai: _ai, db: _db);
-
-    return ResearchAgent(
-      ai: _ai,
-      listTablesTool: listTablesTool(),
-      describeTableTool: describeTableTool(),
-      runQueryTool: runQueryTool(),
-    )();
-  }
+ResearchFlow createResearchFlow({required Genkit ai, required Database db}) {
+  return ResearchAgent(
+    ai: ai,
+    listTablesTool: ListTablesTool(ai: ai, db: db).define(),
+    describeTableTool: DescribeTableTool(ai: ai, db: db).define(),
+    runQueryTool: RunQueryTool(ai: ai, db: db).define(),
+  ).define();
 }
 ```
 
-> Notice: each tool class is instantiated, then `()` calls its `call()` method to register it with Genkit and get back the typed `Tool` object. The same pattern applies to `ResearchAgent`.
+**Verify:** `dart analyze` prints `No issues found!`
 
 ---
 
 ## Step 6: Connect the Agent to the Route
 
-Replace the placeholder in `packages/dart_server/lib/src/routes/research.dart`:
+Replace the contents of `packages/dart_server/lib/src/routes/research.dart` with:
 
 ```dart
 import 'package:genkit/genkit.dart';
 import 'package:relic/relic.dart';
 
-import '../schemas/research_result.dart';
+import '../agent/research_agent.dart';
 import '../utils/request_helpers.dart';
-
-typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 
 class ResearchRoutes {
   final ResearchFlow _researchFlow;
 
-  ResearchRoutes({required ResearchFlow researchFlow})
-    : _researchFlow = researchFlow;
+  ResearchRoutes({required this._researchFlow});
 
-  RelicRouter get router {
-    final router = RelicRouter();
-    router.post('/api/research', _research);
-    return router;
-  }
+  RelicRouter get router => RelicRouter()..post('/api/research', _research);
 
   Future<Response> _research(Request request) async {
     final body = await parseJsonBody(request);
@@ -842,15 +719,19 @@ class ResearchRoutes {
 }
 ```
 
-The `RelicRouter` and the request validation stay as they were in the placeholder. A `RelicRouter` maps a method and a path to a handler: `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, for example a 429 when your API quota runs out.
+How it works:
 
-Until you update the entrypoint in Step 7, `dart analyze` reports a missing `researchFlow` argument in `bin/server.dart`. That is expected.
+- **Routing with Relic:** `RelicRouter()..post('/api/research', _research)` creates a router whose one route sends `POST /api/research` to `_research`. The `..` (a cascade) calls `post` on the new router and gives back the router itself. A Relic handler like `_research` takes a `Request` and returns a `Response`.
+- **Running the agent:** `_researchFlow(question)` runs the agent, and `result.toJson()` turns the `ResearchResult` into the JSON the app reads.
+- **Errors:** `handleGenkitError`, from `request_helpers.dart`, turns a Genkit error into an HTTP status: 429 when your API quota runs out, 503 when the model is overloaded, and 500 otherwise.
+
+`dart analyze` now reports one error in `bin/server.dart`: "The named parameter 'researchFlow' is required". Step 7 fixes it.
 
 ---
 
 ## Step 7: Update the Server Entrypoint
 
-Replace `packages/dart_server/bin/server.dart` to initialize Genkit and the database:
+Replace `packages/dart_server/bin/server.dart` with:
 
 ```dart
 import 'dart:io';
@@ -872,10 +753,10 @@ Future<void> main() async {
   }
 
   final ai = Genkit(plugins: [googleAI()]);
-  final researchFlow = AISetup(ai: ai, db: sqlite3.open(dbPath))();
+  final researchFlow = createResearchFlow(ai: ai, db: sqlite3.open(dbPath));
   final routes = ResearchRoutes(researchFlow: researchFlow);
 
-  // Mounted for every path so cors() also reaches preflights and 404/405s.
+  // Every path goes to the router, so the middleware runs on every request.
   final app = RelicApp()
     ..use('/', cors())
     ..use('/', logRequests())
@@ -888,28 +769,40 @@ Future<void> main() async {
 }
 ```
 
-The `RelicApp` setup, reading `PORT` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `RelicApp` is the server's router: `use` adds middleware, here the pre-built `cors()` and Relic's `logRequests()`. Relic only runs middleware for requests that match a route, so `any('/**', ...)` mounts your router for every method and path; that way CORS headers also reach browser preflights and 404 and 405 answers. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
+How it works:
 
-**Test it live** from the repository root. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..` first.
+- **New at the top of `main`:** the server checks that the database file exists, creates Genkit with the Google AI plugin, opens the database, and passes the flow from `createResearchFlow` (Step 5) to `ResearchRoutes`. `googleAI()` reads your key from the `GOOGLE_API_KEY` environment variable.
+- **The Relic server, unchanged from the starter:** `use` adds middleware, here CORS and request logging. `any('/**', ...)` sends every path to your router, so the middleware runs on every request. `serve` starts listening on port 8080, or on `PORT` if you set it.
 
-```sh
-export GOOGLE_API_KEY=your-key-here
-dart run packages/dart_server/bin/server.dart
-```
+### Test it
 
-```sh
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"Which genre has the most tracks?"}' | jq
-```
+1. Stop the starter server from Step 0 with Ctrl+C in its terminal. It uses port 8080.
+2. In the repository root (the `music-store-agent` folder), set your key and start the server:
 
-You should see a real answer with `toolCalls` showing the agent's exploration sequence. Open the Flutter app and try it there too — the placeholder is gone.
+   ```sh
+   export GOOGLE_API_KEY=your-key-here
+   dart run packages/dart_server/bin/server.dart
+   ```
+
+3. In a second terminal, ask a question:
+
+   ```sh
+   curl -s http://localhost:8080/api/research \
+     -H 'Content-Type: application/json' \
+     -d '{"question":"Which genre has the most tracks?"}'
+   ```
+
+   You should get JSON with an `answer` that names Rock (31 tracks), the SQL behind it in `sources`, and the tools the agent called in `toolCalls`. The wording changes from run to run.
+
+4. Ask the same question in the Flutter app from Step 0. If you closed it, run `flutter run` in `packages/client` again. You get the agent's answer instead of the placeholder.
+
+If curl prints `{"error":"Agent failed. Check server logs for details."}` and the server log shows `apiKey must be set to an API key`, the server can't see your key. Run the `export` line in the server's terminal, then restart the server.
 
 ---
 
 ## You're Done
 
-**Verify:** Run `dart analyze` — no errors. Start the server, open the Flutter app, and ask a question. You should see a real AI-generated answer with SQL sources and a full agent trace.
+You now have a working agent that answers from real query results.
 
 ### What you built
 
@@ -917,38 +810,24 @@ You should see a real answer with `toolCalls` showing the agent's exploration se
 | -------------------- | --------------------------------------------------------------- |
 | **5 schemas**        | Define typed data shapes for tool inputs and agent output       |
 | **3 tools**          | Explore a database: list tables, describe schema, run queries   |
-| **Message helpers**  | Extract tool calls and build research notes from conversations  |
-| **Research agent**   | Two-phase generate: autonomous tool loop + structured synthesis |
-| **Composition root** | Wire all dependencies together                                  |
+| **Message helper**   | List the tools the agent called, for the app's trace            |
+| **Research agent**   | A tool loop that ends in a structured answer                    |
+| **Setup**            | Create the tools and the agent, and connect them                |
 | **Route handler**    | Connect the agent flow to the HTTP endpoint                     |
+| **Entrypoint**       | Start the server with the agent behind the route                |
 
-### Try these questions
+### Try it in the app
 
-```sh
-# Simple lookup
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}' | jq
+Ask these questions in the Flutter app. For each one, look at the answer, its confidence badge, **Queries used**, and the **Agent trace**.
 
-# Multi-table JOINs
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"Who is the top spending customer and what did they buy?"}' | jq
-
-# Many-to-many relationship
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"What songs are in the Chill Jazz playlist?"}' | jq
-
-# Out of scope — agent should gracefully refuse
-curl -s http://localhost:8080/api/research \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"What is the weather today?"}' | jq
-```
+- **"What artists are in the database?"** A simple lookup on one table.
+- **"Who is the top spending customer and what did they buy?"** The agent joins customers, invoices, invoice lines and tracks.
+- **"What songs are in the Chill Jazz playlist?"** The agent goes through `playlist_tracks`, the table that links playlists to tracks.
+- **"What is the weather today?"** The database can't answer this, so the agent says so with low confidence.
 
 ### What's Next
 
-- **Add more tools** — a `sampleRows` tool that returns a few rows from any table
-- **Add tests** — use `ai.defineModel()` to create fake models that simulate the tool-calling loop without API calls (see the `main` branch for examples)
-- **Add streaming** — stream tool activity to the UI in real-time via SSE
-- **Try a different database** — swap `music_store.db` for your own data
+- **Add more tools**: a `sampleRows` tool that returns a few rows from any table
+- **Add tests**: use `ai.defineModel()` to create fake models that simulate the tool-calling loop without API calls (see the `main` branch for examples)
+- **Add streaming**: stream tool activity to the UI in real time with server-sent events (SSE)
+- **Try a different database**: swap `music_store.db` for your own data

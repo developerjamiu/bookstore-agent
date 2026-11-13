@@ -34,15 +34,15 @@ Response errorResponse(int statusCode, String message) {
 
 Response handleGenkitError(GenkitException e) {
   print('Genkit error: $e');
-  final message = e.message.toLowerCase();
-  if (message.contains('quota') || message.contains('resource_exhausted')) {
-    return errorResponse(429, 'API quota exceeded. Please try again later.');
-  }
-  if (message.contains('high demand')) {
-    return errorResponse(
+  return switch (e.status) {
+    StatusCode.resourceExhausted => errorResponse(
+      429,
+      'API quota exceeded. Please try again later.',
+    ),
+    StatusCode.unavailable => errorResponse(
       503,
       'Model is temporarily unavailable. Please retry.',
-    );
-  }
-  return errorResponse(500, 'Agent failed. Check server logs for details.');
+    ),
+    _ => errorResponse(500, 'Agent failed. Check server logs for details.'),
+  };
 }

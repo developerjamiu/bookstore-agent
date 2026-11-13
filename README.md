@@ -53,7 +53,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 ## Repository Structure
 
 ```
-research_assistant/
+music-store-agent/
 ├── pubspec.yaml                         # Dart workspace root
 ├── README.md
 ├── CODELAB.md
@@ -77,8 +77,8 @@ research_assistant/
 │   │   ├── data/music_store.db          # Pre-seeded SQLite database
 │   │   ├── lib/src/
 │   │   │   ├── agent/
-│   │   │   │   ├── research_agent.dart  # Two-phase agent: tool loop + synthesis
-│   │   │   │   └── setup.dart           # Composition root (DI wiring)
+│   │   │   │   ├── research_agent.dart  # Agent: tool loop + JSON answer
+│   │   │   │   └── setup.dart           # Creates the tools and the agent
 │   │   │   ├── tools/
 │   │   │   │   ├── list_tables.dart     # Tool: discover database tables
 │   │   │   │   ├── describe_table.dart  # Tool: inspect table schema
@@ -117,8 +117,8 @@ research_assistant/
 
 ## Prerequisites
 
-- **Dart SDK** >= 3.11 (`dart --version`)
-- **Flutter SDK** >= 3.27 (`flutter --version`)
+- **Flutter SDK** with Dart 3.12 or later (`flutter --version`)
+- **iOS Simulator or Android emulator** (Xcode or Android Studio), to run the Flutter app
 - **Node.js** >= 20 — for `packages/nodejs_server` only
 - **Google AI API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (`GOOGLE_API_KEY` / `GEMINI_API_KEY`; never commit keys)
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer)
@@ -128,9 +128,9 @@ research_assistant/
 ### 1. Clone and install dependencies
 
 ```sh
-git clone git@github.com:developerjamiu/music-store-agent.git
+git clone https://github.com/developerjamiu/music-store-agent.git
 cd music-store-agent
-dart pub get
+flutter pub get
 ```
 
 ### 2. Explore the database
@@ -200,27 +200,27 @@ Server running on http://localhost:8080
 # Simple lookup
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What artists are in the database?"}' | jq
+  -d '{"question":"What artists are in the database?"}'
 
 # Requires multi-table JOINs — watch the toolCalls array
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"Who is the top spending customer and what did they buy?"}' | jq
+  -d '{"question":"Who is the top spending customer and what did they buy?"}'
 
 # Many-to-many relationship
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What songs are in the Chill Jazz playlist?"}' | jq
+  -d '{"question":"What songs are in the Chill Jazz playlist?"}'
 
 # Out of scope — agent should gracefully refuse
 curl -s http://localhost:8080/api/research \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What is the weather today?"}' | jq
+  -d '{"question":"What is the weather today?"}'
 ```
 
 ### 6. Run the Flutter app
 
-With the server running:
+With the server running, start an iOS Simulator or Android emulator, then:
 
 ```sh
 cd packages/client
@@ -247,14 +247,15 @@ This project demonstrates all three properties:
 The model **cannot skip the tools** — it has never seen this database. Every
 answer must come from actual query results, not the model's training data.
 
-### Two-phase generate pattern
+### Tools plus a JSON answer
 
-Gemini doesn't support `tools` + `outputSchema` in the same API call. The
-agent works around this with two separate calls:
-
-1. **Research phase** — tools enabled, `maxTurns: 10`, model explores freely
-2. **Synthesis phase** — `outputSchema` enabled, model produces structured
-   JSON from the research notes
+The agent's `generate` call gets the three tools and `outputSchema`. The
+model calls tools as often as it needs (up to `maxTurns: 10`), then replies in
+the `ResearchOutput` shape. With Gemini this combination is a preview feature
+for Gemini 3 and later models. It was checked live with
+`gemini-3.5-flash-lite`. If the model never ran a query,
+the answer gets low confidence, and if it hits the turn limit, the agent says
+it couldn't finish.
 
 ## What the Starter Branch Contains
 
@@ -276,9 +277,9 @@ agent works around this with two separate calls:
 | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | **Schemas** — `table_name_input.dart`, `sql_query_input.dart`, `research_output.dart`, `research_result.dart`, `tool_call.dart` | Define the data shapes the agent works with using Schemantic                  |
 | **Tools** — `list_tables.dart`, `describe_table.dart`, `run_query.dart`                                                         | Write the logic AND register each tool with Genkit via `ai.defineTool()`      |
-| **Message helpers** — `message_helpers.dart`                                                                                    | Extract tool calls and build research notes from Genkit conversation messages |
-| **Agent** — `research_agent.dart`                                                                                               | Build the two-phase generate: tool-calling loop + structured synthesis        |
-| **Setup** — `setup.dart`                                                                                                        | Wire everything together in the composition root                              |
+| **Message helpers** — `message_helpers.dart`                                                                                    | List the tools the agent called, for the app's trace                          |
+| **Agent** — `research_agent.dart`                                                                                               | Tool-calling loop that ends in a structured JSON answer                       |
+| **Setup** — `setup.dart`                                                                                                        | Create the tools and the agent, and connect them                                |
 | **Route update** — `research.dart`                                                                                              | Replace the placeholder response with the real agent flow                     |
 | **Agent tests** — `research_agent_test.dart`                                                                                    | Test the agent using `ai.defineModel()` with fake responses                   |
 | **Tool tests** — `list_tables_test.dart`, `describe_table_test.dart`, `run_query_test.dart`                                     | Test each tool's logic method against a real in-memory database               |
@@ -296,7 +297,5 @@ agent works around this with two separate calls:
 - **Genkit tools** — `ai.defineTool()` with typed input/output schemas
 - **Genkit flows** — `ai.defineFlow()` for composable, traceable operations
 - **Agentic tool loop** — `maxTurns`, autonomous tool selection, termination
-- **Two-phase generate** — separating tool calling from structured output
-- **Fake model testing** — `ai.defineModel()` for deterministic tests without API calls
-- **Constructor DI** — every class receives dependencies via constructor
-- **Composition root** — one place wires everything together
+- **Tools plus structured output**: `generate` with both `tools` and `outputSchema`
+- **Relic web server**: a `RelicRouter` route handler and a `RelicApp` with middleware

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:dart_server/src/app.dart';
+import 'package:dart_server/src/middleware/cors.dart';
 import 'package:dart_server/src/routes/research.dart';
 import 'package:dart_server/src/schemas/research_result.dart';
 import 'package:dart_server/src/schemas/tool_call.dart';
@@ -31,12 +31,6 @@ Body _json(Object? value) =>
 Headers _contentType(String value) =>
     Headers.build((headers) => headers['Content-Type'] = [value]);
 
-void _discardLog(
-  String message, {
-  StackTrace? stackTrace,
-  LoggerType type = LoggerType.info,
-}) {}
-
 void main() {
   late Genkit ai;
   late List<String> questions;
@@ -64,7 +58,8 @@ void main() {
     );
   }
 
-  /// Sends one request through the same app that `bin/server.dart` serves.
+  /// Sends one request through the routes and CORS middleware, mounted the
+  /// way `bin/server.dart` mounts them.
   ///
   /// The lines the route prints go to [printed] instead of the test output.
   Future<Response> send(
@@ -75,7 +70,9 @@ void main() {
   }) {
     final flow = defineResearchFlow(answer ?? () async => _cannedResult());
     final routes = ResearchRoutes(researchFlow: flow);
-    final app = buildApp(routes.router, logger: _discardLog);
+    final app = RelicApp()
+      ..use('/', cors())
+      ..any('/**', routes.router.asHandler);
     return runZoned(
       () => handle(app.asHandler, method, _url, headers: headers, body: body),
       zoneSpecification: ZoneSpecification(
@@ -222,6 +219,18 @@ void main() {
       expect(printed, ['Unexpected error: Bad state: flow failed on purpose']);
     });
   });
+
+  test(
+    'answers other methods with 405, Allow: POST and the CORS headers',
+    () async {
+      final response = await send(Method.get);
+
+      expect(response.statusCode, 405);
+      expect(response.headers['allow'], ['POST']);
+      expectCorsHeaders(response);
+      expect(questions, isEmpty);
+    },
+  );
 
   group('OPTIONS /api/research', () {
     test('answers the preflight with 200 and the CORS headers', () async {

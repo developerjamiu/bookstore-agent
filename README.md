@@ -84,7 +84,6 @@ research_assistant/
 │   │   ├── bin/server.dart              # Relic server entrypoint
 │   │   ├── data/music_store.db          # Pre-seeded SQLite database
 │   │   ├── lib/src/
-│   │   │   ├── app.dart                 # CORS + request logging for every request
 │   │   │   ├── agent/
 │   │   │   │   ├── research_agent.dart  # Two-phase agent: tool loop + synthesis
 │   │   │   │   └── setup.dart           # Composition root (DI wiring)
@@ -105,7 +104,6 @@ research_assistant/
 │   │           ├── utils/               # Message helper tests
 │   │           ├── routes/              # Route tests (fake flows, in-process server)
 │   │           ├── middleware/          # CORS middleware tests
-│   │           ├── app_test.dart        # CORS + logging on every request
 │   │           └── helpers/             # In-memory test database, in-process server
 │   │
 │   └── client/                          # Flutter app
@@ -165,7 +163,7 @@ extension. You'll see 9 tables with real data:
 ### 3. Run the tests (no API key needed)
 
 ```sh
-# Server: 50 tests using fake models and fake flows
+# Server: 46 tests using fake models and fake flows
 dart test packages/dart_server
 
 # Client — 14 tests using mock HTTP
@@ -278,8 +276,8 @@ agent works around this with two separate calls:
 
 - **Flutter client** — complete, working UI with answer card, tool trace panel,
   loading states, error handling, and "New question" reset
-- **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, `app.dart`
-  (CORS and request logging), `request_helpers.dart`, route returning placeholder data
+- **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, CORS,
+  `request_helpers.dart`, route returning placeholder data
 - **Node server scaffolding** (on starter forks) — `packages/nodejs_server` shell with
   placeholder `POST /api/research`; on **`main`** here, the full Node agent matches the Dart reference
 - **SQLite database** — `packages/dart_server/data/music_store.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)

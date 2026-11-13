@@ -585,9 +585,9 @@ String? _findQueryForResponse(
 
 What each function does:
 
-- `extractToolCalls` lists every tool the model asked for, with its input. The app shows this list as the agent trace.
-- `buildResearchNotes` keeps only the `runQuery` results, each under its SQL. In Step 4, the model writes the final answer from these notes. It skips `listTables` and `describeTable` output, which the answer doesn't need.
-- `_findQueryForResponse` is used by `buildResearchNotes` to find the SQL behind each result. A result doesn't carry its SQL, so it looks up the matching request by their shared `ref` id.
+- `extractToolCalls` lists the tools the model called. The app shows them as the agent trace.
+- `buildResearchNotes` collects the query results, each with its SQL. Step 4 uses them to write the answer.
+- `_findQueryForResponse` helps `buildResearchNotes` find the SQL for each result.
 
 **Verify:** `dart analyze` prints `No issues found!`
 

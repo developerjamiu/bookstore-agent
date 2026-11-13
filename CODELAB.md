@@ -37,12 +37,12 @@ The starter project includes a **complete Flutter app** and a **Dart server skel
 
 **Browse the database:**
 
-Open `packages/server/data/music_store.db` in VS Code with the [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) extension. You'll see 9 tables: artists, albums, tracks, genres, customers, invoices, invoice_lines, playlists, and playlist_tracks. This is the data your agent will explore.
+Open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite Viewer](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) extension. You'll see 9 tables: artists, albums, tracks, genres, customers, invoices, invoice_lines, playlists, and playlist_tracks. This is the data your agent will explore.
 
 **Run the starter server:**
 
 ```sh
-dart run packages/server/bin/server.dart
+dart run packages/dart_server/bin/server.dart
 ```
 
 **Test it with curl:**
@@ -136,7 +136,7 @@ Schemas define the shape of data flowing in and out of your tools and agent. We 
 
 ### Tool input schemas
 
-Create `packages/server/lib/src/schemas/table_name_input.dart`:
+Create `packages/dart_server/lib/src/schemas/table_name_input.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -150,7 +150,7 @@ abstract class $TableNameInput {
 }
 ```
 
-Create `packages/server/lib/src/schemas/sql_query_input.dart`:
+Create `packages/dart_server/lib/src/schemas/sql_query_input.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -170,7 +170,7 @@ abstract class $SqlQueryInput {
 
 ### Agent output schemas
 
-Create `packages/server/lib/src/schemas/tool_call.dart`:
+Create `packages/dart_server/lib/src/schemas/tool_call.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -187,7 +187,7 @@ abstract class $ToolCall {
 }
 ```
 
-Create `packages/server/lib/src/schemas/research_output.dart`:
+Create `packages/dart_server/lib/src/schemas/research_output.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -210,7 +210,7 @@ abstract class $ResearchOutput {
 }
 ```
 
-Create `packages/server/lib/src/schemas/research_result.dart`:
+Create `packages/dart_server/lib/src/schemas/research_result.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -243,7 +243,7 @@ abstract class $ResearchResult {
 ### Generate the code
 
 ```sh
-cd packages/server
+cd packages/dart_server
 dart run build_runner build --delete-conflicting-outputs
 ```
 
@@ -259,7 +259,7 @@ Each tool follows the same pattern: a class with constructor DI, a `call()` meth
 
 ### ListTablesTool
 
-Create `packages/server/lib/src/tools/list_tables.dart`:
+Create `packages/dart_server/lib/src/tools/list_tables.dart`:
 
 ````dart
 import 'package:genkit/genkit.dart';
@@ -312,7 +312,7 @@ class ListTablesTool {
 
 ### DescribeTableTool
 
-Create `packages/server/lib/src/tools/describe_table.dart`:
+Create `packages/dart_server/lib/src/tools/describe_table.dart`:
 
 ````dart
 import 'package:genkit/genkit.dart';
@@ -395,7 +395,7 @@ class DescribeTableTool {
 
 ### RunQueryTool
 
-Create `packages/server/lib/src/tools/run_query.dart`:
+Create `packages/dart_server/lib/src/tools/run_query.dart`:
 
 ````dart
 import 'dart:convert';
@@ -476,7 +476,7 @@ class RunQueryTool {
 
 When the agent finishes its tool-calling loop, we need to extract two things from the conversation: what tools were called (for the UI trace), and what query results came back (for the synthesis phase).
 
-Create `packages/server/lib/src/utils/message_helpers.dart`:
+Create `packages/dart_server/lib/src/utils/message_helpers.dart`:
 
 ````dart
 import 'dart:convert';
@@ -589,7 +589,7 @@ This is the core of the codelab — the agentic flow with two phases.
 
 > **Why two phases?** Gemini doesn't support `tools` + `outputSchema` in the same API call. This is a known limitation.
 
-Create `packages/server/lib/src/agent/research_agent.dart`:
+Create `packages/dart_server/lib/src/agent/research_agent.dart`:
 
 ```dart
 import 'package:genkit/genkit.dart';
@@ -752,7 +752,7 @@ class ResearchAgent {
 
 The composition root creates all dependencies and wires them together in one place.
 
-Create `packages/server/lib/src/agent/setup.dart`:
+Create `packages/dart_server/lib/src/agent/setup.dart`:
 
 ```dart
 import 'package:genkit/genkit.dart';
@@ -793,7 +793,7 @@ class AISetup {
 
 ## Step 6: Connect the Agent to the Route
 
-Replace the placeholder in `packages/server/lib/src/routes/research.dart`:
+Replace the placeholder in `packages/dart_server/lib/src/routes/research.dart`:
 
 ```dart
 import 'package:genkit/genkit.dart';
@@ -843,7 +843,7 @@ class ResearchRoutes {
 
 ## Step 7: Update the Server Entrypoint
 
-Replace `packages/server/bin/server.dart` to initialize Genkit and the database:
+Replace `packages/dart_server/bin/server.dart` to initialize Genkit and the database:
 
 ```dart
 import 'dart:io';
@@ -854,9 +854,9 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:sqlite3/sqlite3.dart';
 
-import 'package:server/src/agent/setup.dart';
-import 'package:server/src/middleware/cors.dart';
-import 'package:server/src/routes/research.dart';
+import 'package:dart_server/src/agent/setup.dart';
+import 'package:dart_server/src/middleware/cors.dart';
+import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
   final dbPath = Platform.script.resolve('../data/music_store.db').toFilePath();
@@ -892,7 +892,7 @@ Future<void> main() async {
 
 ```sh
 export GOOGLE_API_KEY=your-key-here
-dart run packages/server/bin/server.dart
+dart run packages/dart_server/bin/server.dart
 ```
 
 ```sh

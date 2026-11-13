@@ -1,4 +1,4 @@
-name: server
+name: dart_server
 description: Shelf server with a Genkit database agent.
 publish_to: none
 version: 0.1.0

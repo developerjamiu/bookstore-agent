@@ -17,7 +17,7 @@ export GEMINI_API_KEY=your-key-here
 npm start
 ```
 
-The server reads SQLite from `packages/server/data/music_store.db`.
+The server reads SQLite from `packages/dart_server/data/music_store.db`.
 
 ---
 
@@ -547,7 +547,7 @@ import { applyCors, handleCorsPreflight } from './middleware/cors.js';
 import { handleResearchPost } from './routes/research.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '..', '..', 'server', 'data', 'music_store.db');
+const dbPath = path.resolve(__dirname, '..', '..', 'dart_server', 'data', 'music_store.db');
 
 if (!existsSync(dbPath)) {
   console.error(`Database not found at ${dbPath}.`);

@@ -1,8 +1,8 @@
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 
-import 'package:server/src/middleware/cors.dart';
-import 'package:server/src/routes/research.dart';
+import 'package:dart_server/src/middleware/cors.dart';
+import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
   final researchRoutes = ResearchRoutes();

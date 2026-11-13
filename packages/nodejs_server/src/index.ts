@@ -9,7 +9,7 @@ import { applyCors, handleCorsPreflight } from './middleware/cors.js';
 import { handleResearchPost } from './routes/research.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '..', '..', 'dart_server', 'data', 'music_store.db');
+const dbPath = path.resolve(__dirname, '..', '..', 'dart_server', 'data', 'bookstore.db');
 
 if (!existsSync(dbPath)) {
   console.error(`Database not found at ${dbPath}.`);
@@ -45,6 +45,6 @@ server.listen(port, host, () => {
   console.log('Try it:');
   console.log(`  curl -s http://localhost:${port}/api/research \\`);
   console.log('    -H "Content-Type: application/json" \\');
-  console.log('    -d \'{"question":"Which genre has the most tracks?"}\'');
+  console.log('    -d \'{"question":"Which genre has the most books?"}\'');
   console.log('');
 });

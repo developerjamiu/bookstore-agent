@@ -21,10 +21,10 @@ void main() {
 
         return http.Response(
           jsonEncode({
-            'answer': 'Rock has 31 tracks, the most of any genre.',
+            'answer': 'Classics has 12 books, the most of any genre.',
             'sources': [
               'SELECT g.Name, COUNT(*) as cnt FROM genres g '
-                  'JOIN tracks t ON g.GenreId = t.GenreId '
+                  'JOIN books b ON g.GenreId = b.GenreId '
                   'GROUP BY g.Name ORDER BY cnt DESC LIMIT 1',
             ],
             'confidence': 'high',
@@ -36,7 +36,7 @@ void main() {
               },
               {
                 'tool': 'describeTable',
-                'input': jsonEncode({'table': 'tracks'}),
+                'input': jsonEncode({'table': 'books'}),
               },
               {
                 'tool': 'runQuery',
@@ -58,20 +58,20 @@ void main() {
       await tester.pumpAndSettle();
 
       // -- Initial state --
-      expect(find.text('Music Store Agent'), findsOneWidget);
+      expect(find.text('Bookstore Agent'), findsOneWidget);
       expect(find.text('New question'), findsNothing);
 
       // -- Type and submit --
       await tester.enterText(
         find.byType(TextField),
-        'Which genre has the most tracks?',
+        'Which genre has the most books?',
       );
       await tester.tap(find.byIcon(Icons.send));
       await tester.pump();
 
       // -- Loading state --
       expect(
-        find.text('Researching "Which genre has the most tracks?"…'),
+        find.text('Researching "Which genre has the most books?"…'),
         findsOneWidget,
       );
 
@@ -79,7 +79,7 @@ void main() {
 
       // -- Result state --
       expect(
-        find.text('Rock has 31 tracks, the most of any genre.'),
+        find.text('Classics has 12 books, the most of any genre.'),
         findsOneWidget,
       );
       expect(find.text('High confidence'), findsOneWidget);
@@ -103,11 +103,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Rock has 31 tracks, the most of any genre.'),
+        find.text('Classics has 12 books, the most of any genre.'),
         findsNothing,
       );
       expect(find.text('New question'), findsNothing);
-      expect(find.text('Music Store Agent'), findsOneWidget);
+      expect(find.text('Bookstore Agent'), findsOneWidget);
     });
   });
 }

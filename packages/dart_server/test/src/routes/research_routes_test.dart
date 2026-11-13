@@ -22,8 +22,8 @@ final _url = Uri.parse('http://localhost/api/research');
 const _jsonType = 'application/json; charset=utf-8';
 
 ResearchResult _cannedResult() => ResearchResult(
-  answer: 'Rock has the most tracks, from AC/DC to Motörhead.',
-  sources: ['SELECT GenreId, COUNT(*) FROM tracks GROUP BY GenreId'],
+  answer: 'Classics has the most books, from Austen to Brontë.',
+  sources: ['SELECT GenreId, COUNT(*) FROM books GROUP BY GenreId'],
   confidence: 'high',
   toolCalls: [ToolCall(tool: 'listTables', input: '{}')],
 );
@@ -103,20 +103,20 @@ void main() {
         Method.post,
         // The Content-Type the Flutter client sends.
         headers: _contentType('application/json; charset=utf-8'),
-        body: _json({'question': 'Which genre has the most tracks?'}),
+        body: _json({'question': 'Which genre has the most books?'}),
       );
 
       expect(response.statusCode, 200);
       expect(response.body.bodyType?.toHeaderValue(), _jsonType);
       expect(
         await response.readAsString(),
-        '{"answer":"Rock has the most tracks, from AC/DC to Motörhead.",'
-        '"sources":["SELECT GenreId, COUNT(*) FROM tracks GROUP BY GenreId"],'
+        '{"answer":"Classics has the most books, from Austen to Brontë.",'
+        '"sources":["SELECT GenreId, COUNT(*) FROM books GROUP BY GenreId"],'
         '"confidence":"high",'
         '"toolCalls":[{"tool":"listTables","input":"{}"}]}',
       );
       expectCorsHeaders(response);
-      expect(questions, ['Which genre has the most tracks?']);
+      expect(questions, ['Which genre has the most books?']);
       expect(printed, isEmpty);
     });
 
@@ -152,7 +152,7 @@ void main() {
         final response = await send(
           Method.post,
           headers: _contentType(contentType),
-          body: _json({'question': 'Which genre has the most tracks?'}),
+          body: _json({'question': 'Which genre has the most books?'}),
         );
 
         await expectJsonError(response, 400, 'Invalid JSON body');
@@ -201,7 +201,7 @@ void main() {
         () async {
           final response = await send(
             Method.post,
-            body: _json({'question': 'Which genre has the most tracks?'}),
+            body: _json({'question': 'Which genre has the most books?'}),
             answer: () async =>
                 throw GenkitException('failed on purpose', status: status),
           );
@@ -217,7 +217,7 @@ void main() {
     test('maps by status, not by the words in the message', () async {
       final response = await send(
         Method.post,
-        body: _json({'question': 'Which genre has the most tracks?'}),
+        body: _json({'question': 'Which genre has the most books?'}),
         answer: () async => throw GenkitException(
           'RESOURCE_EXHAUSTED: quota exceeded, high demand',
           status: StatusCode.internal,
@@ -293,7 +293,7 @@ void main() {
       test('answers 500 when the model fails', () async {
         final response = await send(
           Method.post,
-          body: _json({'question': 'How many artists are there?'}),
+          body: _json({'question': 'How many authors are there?'}),
           flow: agentFlow(
             (_) async => throw GenkitException(
               'apiKey must be set to an API key',
@@ -314,7 +314,7 @@ void main() {
       test('answers 429 when the model reports an exhausted quota', () async {
         final response = await send(
           Method.post,
-          body: _json({'question': 'How many artists are there?'}),
+          body: _json({'question': 'How many authors are there?'}),
           flow: agentFlow(
             (_) async => throw GenkitException(
               'Quota exceeded for this model.',
@@ -333,7 +333,7 @@ void main() {
       test('answers 500 when a tool fails during research', () async {
         final response = await send(
           Method.post,
-          body: _json({'question': 'How many artists are there?'}),
+          body: _json({'question': 'How many authors are there?'}),
           flow: agentFlow(
             (request) async => ModelResponse(
               finishReason: FinishReason.stop,
@@ -365,7 +365,7 @@ void main() {
       test('answers 500 when the final reply does not parse', () async {
         final response = await send(
           Method.post,
-          body: _json({'question': 'How many artists are there?'}),
+          body: _json({'question': 'How many authors are there?'}),
           flow: agentFlow(
             (request) async => queryThen(request, 'Sorry, no JSON today.'),
           ),
@@ -383,7 +383,7 @@ void main() {
       test('answers 500 when the final reply has the wrong shape', () async {
         final response = await send(
           Method.post,
-          body: _json({'question': 'How many artists are there?'}),
+          body: _json({'question': 'How many authors are there?'}),
           flow: agentFlow(
             (request) async => queryThen(request, '{"answer": 42}'),
           ),
@@ -401,7 +401,7 @@ void main() {
     test('answers 500 when the flow throws any other error', () async {
       final response = await send(
         Method.post,
-        body: _json({'question': 'Which genre has the most tracks?'}),
+        body: _json({'question': 'Which genre has the most books?'}),
         answer: () async => throw StateError('flow failed on purpose'),
       );
 

@@ -14,6 +14,6 @@ void main() {
       ),
     );
 
-    expect(find.text('Music Store Agent'), findsOneWidget);
+    expect(find.text('Bookstore Agent'), findsOneWidget);
   });
 }

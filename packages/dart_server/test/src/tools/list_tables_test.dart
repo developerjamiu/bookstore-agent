@@ -24,15 +24,15 @@ void main() {
     test('returns all seeded table names', () async {
       final result = await tool.list();
 
-      expect(result, contains('- albums'));
-      expect(result, contains('- artists'));
-      expect(result, contains('- tracks'));
+      expect(result, contains('- authors'));
+      expect(result, contains('- publishers'));
+      expect(result, contains('- books'));
       expect(result, contains('- genres'));
       expect(result, contains('- customers'));
-      expect(result, contains('- invoices'));
-      expect(result, contains('- invoice_lines'));
-      expect(result, contains('- playlists'));
-      expect(result, contains('- playlist_tracks'));
+      expect(result, contains('- orders'));
+      expect(result, contains('- order_items'));
+      expect(result, contains('- reading_lists'));
+      expect(result, contains('- reading_list_books'));
     });
 
     test('returns a message for an empty database', () async {

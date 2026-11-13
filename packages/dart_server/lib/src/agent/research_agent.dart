@@ -14,7 +14,7 @@ typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 class ResearchAgent {
   static const _prompt =
       'You are a database analyst. Answer questions ONLY from the results of '
-      'queries you run on the music store database, never from your own '
+      'queries you run on the bookstore database, never from your own '
       'knowledge.\n\n'
       'You do not know the database schema. To answer:\n'
       '1. Use listTables to see what tables exist.\n'
@@ -26,7 +26,7 @@ class ResearchAgent {
       'tools and reply.\n\n'
       'In your reply:\n'
       '- answer: interpret the query results clearly. When listing items such '
-      'as tracks, name each distinct item once and give a count when it '
+      'as books, name each distinct item once and give a count when it '
       'appears more than once.\n'
       '- sources: the SELECT statements that produced the key results.\n'
       '- confidence: "high" if the results clearly answer the question, '

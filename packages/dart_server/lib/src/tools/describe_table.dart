@@ -32,12 +32,12 @@ class DescribeTableTool {
   /// Returns column info and foreign keys, or a not-found message.
   ///
   /// ```
-  /// Columns in "tracks":
-  /// - TrackId INTEGER NOT NULL PRIMARY KEY
-  /// - Name TEXT NOT NULL
-  /// - AlbumId INTEGER
+  /// Columns in "books":
+  /// - BookId INTEGER PRIMARY KEY
+  /// - Title TEXT NOT NULL
+  /// - AuthorId INTEGER NOT NULL
   /// Foreign keys:
-  /// - AlbumId -> albums(AlbumId)
+  /// - AuthorId -> authors(AuthorId)
   /// ```
   Future<String> describe(TableNameInput input) async {
     final tableName = input.table;

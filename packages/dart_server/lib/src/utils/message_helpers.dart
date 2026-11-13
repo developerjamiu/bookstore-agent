@@ -8,8 +8,8 @@ import '../schemas/tool_call.dart';
 ///
 /// ```
 /// [ToolCall(tool: "listTables", input: "{}"),
-///  ToolCall(tool: "describeTable", input: "{\"table\":\"artists\"}"),
-///  ToolCall(tool: "runQuery", input: "{\"sql\":\"SELECT Name FROM artists\"}")]
+///  ToolCall(tool: "describeTable", input: "{\"table\":\"authors\"}"),
+///  ToolCall(tool: "runQuery", input: "{\"sql\":\"SELECT Name FROM authors\"}")]
 /// ```
 List<ToolCall> extractToolCalls(List<Message> messages) {
   final calls = <ToolCall>[];

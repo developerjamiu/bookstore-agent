@@ -74,7 +74,6 @@ class ResearchAgent {
       outputSchema: ResearchOutput.$schema,
       maxTurns: _maxTurns,
     );
-    _throwIfFailed(response);
     final toolCalls = extractToolCalls(response.messages);
 
     // The model hit the turn limit before it wrote an answer.
@@ -87,13 +86,15 @@ class ResearchAgent {
       );
     }
 
-    // A reply that does not match the schema comes back as an error on the
-    // result instead of a throw. Fail here so the route answers 500.
+    // Genkit reports failures in the result instead of throwing.
+    // Throw here so the route answers with an HTTP error.
     final output = response.output;
     if (output == null) {
+      final cause = response.cause;
+      if (cause is GenkitException) throw cause;
       throw GenkitException(
-        response.error?.message ?? 'The model returned no structured answer.',
-        cause: response.cause,
+        response.error?.message ?? 'The model returned no answer.',
+        cause: cause,
       );
     }
 
@@ -104,21 +105,6 @@ class ResearchAgent {
       sources: ranQuery ? output.sources : const [],
       confidence: ranQuery ? output.confidence : 'low',
       toolCalls: toolCalls,
-    );
-  }
-
-  /// Throws if the model call failed.
-  ///
-  /// Genkit 1.0 reports failures in the result instead of throwing, so this
-  /// turns them back into an error the route can send as an HTTP error.
-  static void _throwIfFailed(GenerateResult response) {
-    if (response.finishReason != FinishReason.failed) return;
-
-    final cause = response.cause;
-    if (cause is GenkitException) throw cause;
-    throw GenkitException(
-      response.error?.message ?? 'Generation failed.',
-      cause: cause,
     );
   }
 }

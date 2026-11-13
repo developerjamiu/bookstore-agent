@@ -443,8 +443,8 @@ class RunQueryTool {
     return _ai.defineTool(
       name: 'runQuery',
       description:
-          'Execute a read-only SQL SELECT query and return the results '
-          'as a formatted table. Returns up to $_maxRows rows. Only '
+          'Execute a read-only SQL SELECT query and return the rows '
+          'as JSON. Returns up to $_maxRows rows. Only '
           'SELECT statements are allowed.',
       inputSchema: SqlQueryInput.$schema,
       outputSchema: SchemanticType.string(),
@@ -644,7 +644,7 @@ import '../utils/message_helpers.dart';
 class ResearchAgent {
   static const _researchPrompt =
       'You are a database analyst agent. You can ONLY answer questions '
-      'by querying the music store database — never use your own knowledge. '
+      'by querying the music store database. Never use your own knowledge. '
       'You do NOT know the database schema, so you must discover it using '
       'the tools provided:\n'
       '- listTables: discover what tables exist\n'

@@ -168,8 +168,8 @@ export function createRunQueryTool(ai: Genkit, db: Database) {
     {
       name: 'runQuery',
       description:
-        'Execute a read-only SQL SELECT query and return the results ' +
-        'as a formatted table. Returns up to ' +
+        'Execute a read-only SQL SELECT query and return the rows ' +
+        'as JSON. Returns up to ' +
         MAX_ROWS +
         ' rows. Only SELECT statements are allowed.',
       inputSchema: z.object({
@@ -325,7 +325,7 @@ import { buildResearchNotes, extractToolCalls } from '../utils/messageHelpers.js
 
 const RESEARCH_PROMPT =
   'You are a database analyst agent. You can ONLY answer questions ' +
-  'by querying the music store database — never use your own knowledge. ' +
+  'by querying the music store database. Never use your own knowledge. ' +
   'You do NOT know the database schema, so you must discover it using ' +
   'the tools provided:\n' +
   '- listTables: discover what tables exist\n' +

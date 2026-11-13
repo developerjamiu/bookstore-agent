@@ -29,8 +29,9 @@ class ResearchAgent {
       'as books, name each distinct item once and give a count when it '
       'appears more than once.\n'
       '- sources: the SELECT statements that produced the key results.\n'
-      '- confidence: "high" if the results clearly answer the question, '
-      '"medium" if partially, "low" if the database cannot answer it.';
+      '- confidence: "low" if the database cannot answer the question, even '
+      'if you ran queries. Otherwise "high" if the results clearly answer it, '
+      'or "medium" if they answer it partially.';
 
   static const _maxTurns = 10;
 

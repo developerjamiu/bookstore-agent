@@ -10,29 +10,24 @@ import '../utils/message_helpers.dart';
 
 class ResearchAgent {
   static const _prompt =
-      'You are a database analyst agent. You can ONLY answer questions '
-      'by querying the music store database. Never use your own knowledge. '
-      'You do NOT know the database schema, so you must discover it using '
-      'the tools provided:\n'
-      '- listTables: discover what tables exist\n'
-      '- describeTable: see the columns and foreign keys of a table\n'
-      '- runQuery: execute a read-only SQL SELECT query\n\n'
-      'Strategy:\n'
-      '1. Use listTables to discover what tables exist.\n'
-      '2. Call describeTable on relevant tables to understand columns and joins.\n'
-      '3. Write and run SQL queries to find the answer.\n'
+      'You are a database analyst. Answer questions ONLY from the results of '
+      'queries you run on the music store database, never from your own '
+      'knowledge.\n\n'
+      'You do not know the database schema. To answer:\n'
+      '1. Use listTables to see what tables exist.\n'
+      '2. Use describeTable on the relevant tables to learn their columns and joins.\n'
+      '3. Write and run SQL queries with runQuery.\n'
       '4. If a query returns unexpected results, try a different approach.\n'
-      '5. If the question cannot be answered with the available data, say so.\n'
+      '5. If the data cannot answer the question, say so.\n'
       '6. As soon as your query results answer the question, stop calling '
       'tools and reply.\n\n'
-      'When you are done, reply with:\n'
-      '- answer: a clear answer that interprets the query results. When '
-      'listing items such as tracks, name each distinct item once and give '
-      'a count when it appears more than once.\n'
+      'In your reply:\n'
+      '- answer: interpret the query results clearly. When listing items such '
+      'as tracks, name each distinct item once and give a count when it '
+      'appears more than once.\n'
       '- sources: the SELECT statements that produced the key results.\n'
-      '- confidence: "high" if the query results clearly answer the '
-      'question, "medium" if partially, "low" if the data was not found.\n\n'
-      'NEVER answer from your own knowledge. All answers must come from query results.';
+      '- confidence: "high" if the results clearly answer the question, '
+      '"medium" if partially, "low" if the database cannot answer it.';
 
   static const _maxTurns = 10;
 
@@ -64,8 +59,8 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    // One call: the model uses the tools as often as it needs, up to
-    // _maxTurns times, then replies in the ResearchOutput shape.
+    // The model uses the tools as often as it needs, up to _maxTurns
+    // times, then replies in the ResearchOutput shape.
     final response = await _ai.generate(
       model: _model,
       system: _prompt,

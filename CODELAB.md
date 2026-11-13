@@ -140,7 +140,7 @@ In this step you'll:
 
 ### Tool input schemas
 
-Create `packages/dart_server/lib/src/schemas/table_name_input.dart`:
+The input for `describeTable`, which names the table to look at. Create `packages/dart_server/lib/src/schemas/table_name_input.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -154,7 +154,7 @@ abstract class $TableNameInput {
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/sql_query_input.dart`:
+The input for `runQuery`, which holds the SQL to run. Create `packages/dart_server/lib/src/schemas/sql_query_input.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -174,7 +174,7 @@ abstract class $SqlQueryInput {
 
 ### Agent output schemas
 
-Create `packages/dart_server/lib/src/schemas/tool_call.dart`:
+One step in the agent trace the app shows: which tool was called, and with what input. Create `packages/dart_server/lib/src/schemas/tool_call.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -191,7 +191,7 @@ abstract class $ToolCall {
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/research_output.dart`:
+The structured answer Gemini writes in Phase 2 (Step 4). Create `packages/dart_server/lib/src/schemas/research_output.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -214,7 +214,7 @@ abstract class $ResearchOutput {
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/research_result.dart`:
+What the server sends back to the app. It has the same fields as `ResearchOutput`, plus the tool trace that your code collects. Create `packages/dart_server/lib/src/schemas/research_result.dart`:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -241,8 +241,6 @@ abstract class $ResearchResult {
   List<$ToolCall> get toolCalls;
 }
 ```
-
-> **Why two output schemas?** `ResearchOutput` is the answer the model writes in Step 4's synthesis phase. `ResearchResult` is what the server returns: the same fields plus `toolCalls`, which your code collects, not the model.
 
 ### Generate the code
 
@@ -272,7 +270,7 @@ Two pieces of new syntax:
 
 ### ListTablesTool
 
-Create `packages/dart_server/lib/src/tools/list_tables.dart`:
+Lets the agent discover which tables exist. Create `packages/dart_server/lib/src/tools/list_tables.dart`:
 
 ````dart
 import 'package:genkit/genkit.dart';
@@ -323,7 +321,7 @@ class ListTablesTool {
 
 ### DescribeTableTool
 
-Create `packages/dart_server/lib/src/tools/describe_table.dart`:
+Shows the agent a table's columns and foreign keys, so it can work out joins. Create `packages/dart_server/lib/src/tools/describe_table.dart`:
 
 ````dart
 import 'package:genkit/genkit.dart';
@@ -404,7 +402,7 @@ class DescribeTableTool {
 
 ### RunQueryTool
 
-Create `packages/dart_server/lib/src/tools/run_query.dart`:
+Runs a read-only `SELECT` and returns up to 50 rows as JSON. Create `packages/dart_server/lib/src/tools/run_query.dart`:
 
 ````dart
 import 'dart:convert';

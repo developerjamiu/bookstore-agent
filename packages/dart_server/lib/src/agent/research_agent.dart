@@ -92,12 +92,9 @@ class ResearchAgent {
     );
   }
 
-  /// Runs the tool loop.
-  ///
-  /// When the loop reaches `maxTurns`, Genkit returns a result with
-  /// `finishReason: aborted` that keeps the messages so far, instead of
-  /// throwing. A cancel also ends as aborted, but this agent passes no
-  /// cancellation token, so here aborted always means the turn limit.
+  /// Phase 1: the model calls tools until it can answer, up to
+  /// [_maxTurns] times. Hitting the limit doesn't throw. Genkit returns
+  /// everything that happened so far.
   Future<GenerateResult> _runResearchPhase(String question) async {
     final response = await _ai.generate(
       model: _model,
@@ -134,12 +131,10 @@ class ResearchAgent {
     return output;
   }
 
-  /// Throws when [response] reports a failed generation.
+  /// Throws if the model call failed.
   ///
-  /// Genkit 1.0 no longer throws when the model or a tool fails. It returns
-  /// a result with `finishReason: failed`, the thrown object as `cause` and
-  /// a structured `error`. Rethrowing keeps the route's error handling, which
-  /// maps a [GenkitException] status to an HTTP status.
+  /// Genkit 1.0 reports failures in the result instead of throwing, so this
+  /// turns them back into an error the route can send as an HTTP error.
   static void _throwIfFailed(GenerateResult response) {
     if (response.finishReason != FinishReason.failed) return;
 

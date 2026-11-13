@@ -6,9 +6,9 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:sqlite3/sqlite3.dart';
 
-import 'package:server/src/agent/setup.dart';
-import 'package:server/src/middleware/cors.dart';
-import 'package:server/src/routes/research.dart';
+import 'package:dart_server/src/agent/setup.dart';
+import 'package:dart_server/src/middleware/cors.dart';
+import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
   final dbPath = Platform.script.resolve('../data/music_store.db').toFilePath();

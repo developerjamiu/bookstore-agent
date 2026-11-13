@@ -41,7 +41,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 | ------------ | ----------------------------------------------------------- |
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) |
 | LLM          | Google Gemini (via `genkit_google_genai`)                   |
-| Server       | Shelf (Dart) or Node.js HTTP server (`packages/server` · `packages/nodejs_server`) |
+| Server       | Shelf (Dart) or Node.js HTTP server (`packages/dart_server` · `packages/nodejs_server`) |
 | Database     | SQLite (in-process, no server needed)                       |
 | Schemas      | Schemantic (code-generated JSON schemas)                    |
 | Client       | Flutter (Material 3)                                        |
@@ -80,7 +80,7 @@ research_assistant/
 │   │           ├── researchAgent.ts      # Two-phase agent: tool loop + structured synthesis
 │   │           └── setup.ts             # Composition root: Genkit + tools + flow
 │   │
-│   ├── server/
+│   ├── dart_server/
 │   │   ├── bin/server.dart              # Shelf server entrypoint
 │   │   ├── data/music_store.db          # Pre-seeded SQLite database
 │   │   ├── lib/src/
@@ -143,7 +143,7 @@ dart pub get
 
 ### 2. Explore the database
 
-Open `packages/server/data/music_store.db` in VS Code with the SQLite Viewer
+Open `packages/dart_server/data/music_store.db` in VS Code with the SQLite Viewer
 extension. You'll see 9 tables with real data:
 
 | Table           | Rows | Description                                       |
@@ -162,7 +162,7 @@ extension. You'll see 9 tables with real data:
 
 ```sh
 # Server — 25 tests using fake models
-dart test packages/server
+dart test packages/dart_server
 
 # Client — 14 tests using mock HTTP
 cd packages/client && flutter test
@@ -176,7 +176,7 @@ The client tests use `MockClient` to return canned HTTP responses.
 
 ```sh
 export GOOGLE_API_KEY=your-key-here
-dart run packages/server/bin/server.dart
+dart run packages/dart_server/bin/server.dart
 ```
 
 You'll see:
@@ -192,7 +192,7 @@ Try it:
 
 ### 4b. Start the Node.js server (alternative backend)
 
-Use **either** the Dart server **or** the Node server on port **8080** — not both at once. The Node app reads the same database file: `packages/server/data/music_store.db`.
+Use **either** the Dart server **or** the Node server on port **8080** — not both at once. The Node app reads the same database file: `packages/dart_server/data/music_store.db`.
 
 ```sh
 cd packages/nodejs_server
@@ -271,11 +271,11 @@ agent works around this with two separate calls:
 
 - **Flutter client** — complete, working UI with answer card, tool trace panel,
   loading states, error handling, and "New question" reset
-- **Dart server scaffolding** — `packages/server`: `bin/server.dart`, CORS,
+- **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, CORS,
   `request_helpers.dart`, route returning placeholder data
 - **Node server scaffolding** (on starter forks) — `packages/nodejs_server` shell with
   placeholder `POST /api/research`; on **`main`** here, the full Node agent matches the Dart reference
-- **SQLite database** — `packages/server/data/music_store.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)
+- **SQLite database** — `packages/dart_server/data/music_store.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)
 - **Pubspec files** — all dependencies already configured
 - **Client tests** — unit, widget, and integration tests (all passing)
 

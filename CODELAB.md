@@ -760,7 +760,7 @@ How it works:
 
 `call()` wraps `research` in a Genkit flow, the function the route will run.
 
-> **Why two calls?** Gemini can combine tools and a fixed answer format only as a preview feature. When we tried it, the model kept calling tools and never answered.
+> **Why not one call?** Asking Gemini to use tools and reply as JSON in the same call is still experimental. When we tried it, Gemini kept calling tools and never wrote an answer. So one call does the research, and a second call writes the answer.
 
 **Verify:** `dart analyze` prints `No issues found!`
 

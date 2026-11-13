@@ -259,7 +259,7 @@ dart run build_runner build
 Create the three tools below. Each is a class with three parts:
 
 - A constructor that receives `ai` and `db`
-- `call()`, which registers the tool with Genkit
+- `define()`, which registers the tool with Genkit
 - A plain method (`list`, `describe`, `query`) that holds the logic
 
 ### ListTablesTool
@@ -280,7 +280,7 @@ class ListTablesTool {
 
   ListTablesTool({required this._ai, required this._db});
 
-  Tool<void, String> call() {
+  Tool<void, String> define() {
     return _ai.defineTool(
       name: 'listTables',
       description:
@@ -339,7 +339,7 @@ class DescribeTableTool {
 
   DescribeTableTool({required this._ai, required this._db});
 
-  Tool<TableNameInput, String> call() {
+  Tool<TableNameInput, String> define() {
     return _ai.defineTool(
       name: 'describeTable',
       description:
@@ -422,7 +422,7 @@ class RunQueryTool {
 
   RunQueryTool({required this._ai, required this._db});
 
-  Tool<SqlQueryInput, String> call() {
+  Tool<SqlQueryInput, String> define() {
     return _ai.defineTool(
       name: 'runQuery',
       description:
@@ -580,7 +580,7 @@ class ResearchAgent {
     required this._runQueryTool,
   }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
-  Flow<String, ResearchResult, Never, Never> call() {
+  Flow<String, ResearchResult, Never, Never> define() {
     return _ai.defineFlow(
       name: 'researchFlow',
       inputSchema: SchemanticType.string(),
@@ -643,7 +643,7 @@ How it works:
 - **No query, low confidence:** if the model never called `runQuery`, nothing came from the database, so the answer gets `low` confidence and no sources.
 - **Errors:** Genkit doesn't throw when the model call fails. It returns a result with no `output`. The agent throws instead, so the route in Step 6 can answer with an HTTP error.
 
-`call()` wraps `research` in a Genkit flow, the function the route will run.
+`define()` wraps `research` in a Genkit flow, the function the route will run.
 
 **Verify:** `dart analyze` prints `No issues found!`
 
@@ -663,28 +663,18 @@ import '../tools/list_tables.dart';
 import '../tools/run_query.dart';
 import 'research_agent.dart';
 
-class AISetup {
-  final Genkit _ai;
-  final Database _db;
-
-  AISetup({required this._ai, required this._db});
-
-  Flow<String, ResearchResult, Never, Never> call() {
-    final listTablesTool = ListTablesTool(ai: _ai, db: _db);
-    final describeTableTool = DescribeTableTool(ai: _ai, db: _db);
-    final runQueryTool = RunQueryTool(ai: _ai, db: _db);
-
-    return ResearchAgent(
-      ai: _ai,
-      listTablesTool: listTablesTool(),
-      describeTableTool: describeTableTool(),
-      runQueryTool: runQueryTool(),
-    )();
-  }
+Flow<String, ResearchResult, Never, Never> createResearchFlow({
+  required Genkit ai,
+  required Database db,
+}) {
+  return ResearchAgent(
+    ai: ai,
+    listTablesTool: ListTablesTool(ai: ai, db: db).define(),
+    describeTableTool: DescribeTableTool(ai: ai, db: db).define(),
+    runQueryTool: RunQueryTool(ai: ai, db: db).define(),
+  ).define();
 }
 ```
-
-> Notice: an object with a `call()` method runs like a function, so `listTablesTool()` registers the tool and returns its `Tool`. `ResearchAgent(...)()` returns the flow.
 
 **Verify:** `dart analyze` prints `No issues found!`
 
@@ -770,7 +760,7 @@ Future<void> main() async {
   }
 
   final ai = Genkit(plugins: [googleAI()]);
-  final researchFlow = AISetup(ai: ai, db: sqlite3.open(dbPath))();
+  final researchFlow = createResearchFlow(ai: ai, db: sqlite3.open(dbPath));
   final routes = ResearchRoutes(researchFlow: researchFlow);
 
   // Mounted for every path so cors() also reaches preflights and 404/405s.

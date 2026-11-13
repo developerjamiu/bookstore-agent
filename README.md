@@ -117,8 +117,8 @@ research_assistant/
 
 ## Prerequisites
 
-- **Dart SDK** >= 3.11 (`dart --version`)
-- **Flutter SDK** >= 3.27 (`flutter --version`)
+- **Dart SDK** >= 3.12 (`dart --version`)
+- **Flutter SDK** that bundles Dart 3.12 or later (`flutter --version`)
 - **Node.js** >= 20 — for `packages/nodejs_server` only
 - **Google AI API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (`GOOGLE_API_KEY` / `GEMINI_API_KEY`; never commit keys)
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer)
@@ -249,8 +249,10 @@ answer must come from actual query results, not the model's training data.
 
 ### Two-phase generate pattern
 
-Gemini doesn't support `tools` + `outputSchema` in the same API call. The
-agent works around this with two separate calls:
+Sending `tools` and `outputSchema` in one Gemini call is only a preview
+feature. In a live test on 2026-11-13, a single call with both made the model
+loop on tool calls without ever answering. Two separate calls keep the
+research and the structured answer reliable:
 
 1. **Research phase** — tools enabled, `maxTurns: 10`, model explores freely
 2. **Synthesis phase** — `outputSchema` enabled, model produces structured

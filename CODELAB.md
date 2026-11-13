@@ -478,11 +478,7 @@ class RunQueryTool {
 
 ## Step 3: Build the Message Helpers
 
-These two helpers read the agent's conversation. `extractToolCalls` lists the tools it called, for the app's trace. `buildResearchNotes` collects the query results, for Phase 2 in Step 4.
-
-Both read a `GenerateResult`, which `ai.generate()` returns. Its `text` is the model's final reply, and its `messages` are the whole conversation. Each message has a role (user, model or tool) and a list of parts. Model messages carry tool requests, tool messages carry the responses, and each pair shares a `ref` id. A response doesn't include the SQL, so `_findQueryForResponse` uses the `ref` to find the request that ran it.
-
-Create `packages/dart_server/lib/src/utils/message_helpers.dart`:
+Create `packages/dart_server/lib/src/utils/message_helpers.dart`, with two helpers that read the agent's conversation. `extractToolCalls` lists the tools it called, for the app's trace. `buildResearchNotes` collects the query results, for Phase 2 in Step 4:
 
 ````dart
 import 'dart:convert';
@@ -584,6 +580,8 @@ String? _findQueryForResponse(
   return null;
 }
 ````
+
+> Notice: `ai.generate()` returns a `GenerateResult`, and its `messages` hold the whole conversation. Model messages ask for tools, and tool messages carry the results. A result doesn't include the SQL that produced it, so `_findQueryForResponse` finds the matching request through their shared `ref` id.
 
 > **Why filter out `listTables` and `describeTable` results?** The synthesis phase only needs query results to write its answer. Schema exploration output adds cost and can confuse the model.
 

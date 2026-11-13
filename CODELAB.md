@@ -4,7 +4,7 @@ In this codelab, you'll build your first AI agent with Genkit and Dart. Ask it a
 
 That is what makes it an **agent** rather than a chatbot. A chatbot answers from what it already knows. An agent takes actions, here calling tools that read the database, then looks at each result and decides what to do next, until it has an answer.
 
-[Genkit](https://genkit.dev/) is Google's open-source framework for AI apps: it sends your prompts to a model such as Gemini and runs the tools the model asks for.
+[Genkit](https://genkit.dev/) is Google's open-source framework for AI apps. It sends your prompts to a model such as Gemini and runs the tools the model asks for.
 
 **What you'll learn:**
 
@@ -929,7 +929,7 @@ Future<void> main() async {
 }
 ```
 
-Everything above the `RelicApp` setup is new: it checks that the database file exists, creates Genkit with the Google AI plugin, opens the database, builds the research flow you wired in Step 5 and passes it to `ResearchRoutes`. `googleAI()` reads your key from `GOOGLE_API_KEY`. The `RelicApp` setup is unchanged from the starter.
+Everything above the `RelicApp` setup is new. It checks that the database file exists, creates Genkit with the Google AI plugin, opens the database, builds the research flow you wired in Step 5 and passes it to `ResearchRoutes`. `googleAI()` reads your key from `GOOGLE_API_KEY`. The `RelicApp` setup is unchanged from the starter.
 
 **Test it live** from the repository root. First stop the starter server from Step 0 (Ctrl+C in its terminal), because it still holds port 8080. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..`.
 
@@ -946,7 +946,7 @@ curl -s http://localhost:8080/api/research \
 
 You should see an answer naming Rock (31 tracks), the SQL behind it in `sources`, and `toolCalls` showing the agent's exploration sequence. The wording varies by run. Open the Flutter app and try it there too: the placeholder is gone.
 
-If curl prints `Agent failed. Check server logs for details.` and the server log says `apiKey must be set to an API key`, the server can't see your key: export it in the server's terminal and restart.
+If curl prints `Agent failed. Check server logs for details.` and the server log says `apiKey must be set to an API key`, the server can't see your key. Export it in the server's terminal and restart.
 
 ---
 

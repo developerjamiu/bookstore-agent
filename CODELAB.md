@@ -147,7 +147,7 @@ import 'package:schemantic/schemantic.dart';
 
 part 'table_name_input.g.dart';
 
-@Schema(description: 'Input specifying a database table to inspect')
+@Schema(description: 'Which table to look at')
 abstract class $TableNameInput {
   @StringField(description: 'The name of the table, as returned by listTables.')
   String get table;
@@ -161,7 +161,7 @@ import 'package:schemantic/schemantic.dart';
 
 part 'sql_query_input.g.dart';
 
-@Schema(description: 'A SQL query to execute against the database')
+@Schema(description: 'The SQL query to run')
 abstract class $SqlQueryInput {
   @StringField(
     description:
@@ -174,33 +174,33 @@ abstract class $SqlQueryInput {
 
 ### Agent output schemas
 
-Create `packages/dart_server/lib/src/schemas/tool_call.dart`, one step in the agent trace (which tool was called, with what input):
+Create `packages/dart_server/lib/src/schemas/tool_call.dart`, which records one tool the agent called and what it sent. The app lists these so you can watch the agent work:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
 
 part 'tool_call.g.dart';
 
-@Schema(description: 'A tool invocation made by the research agent')
+@Schema(description: 'A tool the agent called')
 abstract class $ToolCall {
-  @StringField(description: 'Name of the tool that was called')
+  @StringField(description: 'The name of the tool')
   String get tool;
 
-  @StringField(description: 'JSON-encoded input passed to the tool')
+  @StringField(description: 'What the agent sent to the tool, as JSON text')
   String get input;
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/research_output.dart`, the structured answer Gemini writes in Phase 2:
+Create `packages/dart_server/lib/src/schemas/research_output.dart`, the answer Gemini writes from the query results:
 
 ```dart
 import 'package:schemantic/schemantic.dart';
 
 part 'research_output.g.dart';
 
-@Schema(description: 'Synthesized answer produced by the research agent')
+@Schema(description: 'The answer Gemini writes from the query results')
 abstract class $ResearchOutput {
-  @StringField(description: 'The synthesized answer to the question')
+  @StringField(description: 'The answer to the question')
   String get answer;
 
   @Field(description: 'SQL queries used to produce the answer')
@@ -214,7 +214,7 @@ abstract class $ResearchOutput {
 }
 ```
 
-Create `packages/dart_server/lib/src/schemas/research_result.dart`, what the server sends back to the app (the `ResearchOutput` fields plus the tool trace):
+Create `packages/dart_server/lib/src/schemas/research_result.dart`, what the server sends back to the app (the answer plus the tools the agent called):
 
 ```dart
 import 'package:schemantic/schemantic.dart';
@@ -223,9 +223,9 @@ import 'tool_call.dart';
 
 part 'research_result.g.dart';
 
-@Schema(description: 'Final result returned by the research agent flow')
+@Schema(description: 'The answer the server sends back to the app')
 abstract class $ResearchResult {
-  @StringField(description: 'The synthesized answer to the question')
+  @StringField(description: 'The answer to the question')
   String get answer;
 
   @Field(description: 'SQL queries used to produce the answer')
@@ -237,7 +237,7 @@ abstract class $ResearchResult {
   )
   String get confidence;
 
-  @Field(description: 'Tools the agent invoked while researching')
+  @Field(description: 'The tools the agent called, in order')
   List<$ToolCall> get toolCalls;
 }
 ```

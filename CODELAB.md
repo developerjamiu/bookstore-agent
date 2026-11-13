@@ -107,7 +107,7 @@ The agent decides which tool to call, in what order, and when to stop. For this 
 
 The model (Gemini) chooses every step. Your code only provides the tools.
 
-After the loop, a second model call turns the query results into a structured answer with the text, the SQL behind it and a confidence level. If no query ran, for example for a weather question, the agent skips that call and replies with low confidence.
+After the loop, a second model call turns the query results into a structured answer with the text, the SQL behind it and a confidence level. If no query ran, for example for an off-topic question like "What is the weather today?", the agent skips that call and replies with low confidence.
 
 What happens when the app sends a question (errors left out):
 
@@ -754,7 +754,7 @@ How it works:
 
 - **The prompt:** `_researchPrompt` tells the model it doesn't know the database and must answer only from query results. That is what makes it explore.
 - **Phase 1:** `_runResearchPhase` makes one `generate` call with your three tools. Gemini keeps calling tools until it can answer, up to 10 times.
-- **No query, no Phase 2:** if the model never called `runQuery`, nothing came from the database. The agent returns the model's reply with `low` confidence, which is how a weather question gets a polite refusal.
+- **No query, no Phase 2:** if the model never called `runQuery`, nothing came from the database. The agent returns the model's reply with `low` confidence. That is how a question the database can't answer, like "What is the weather today?", gets a polite refusal.
 - **Phase 2:** `_runSynthesisPhase` sends the notes to Gemini with `outputSchema`, so the answer comes back as a `ResearchOutput`.
 - **Errors:** `_throwIfFailed` turns a failed model call into an error, which the route sends back as an HTTP error in Step 6.
 

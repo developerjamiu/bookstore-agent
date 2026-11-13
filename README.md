@@ -152,13 +152,13 @@ extension. You'll see 9 tables with real data:
 | ------------------ | ---- | ----------------------------------------------------- |
 | authors            | 15   | Jane Austen, Charles Dickens, Jules Verne, etc.       |
 | publishers         | 5    | Harbor Press, Northwind Books, etc.                   |
-| books              | 39   | Pride and Prejudice, Treasure Island, Longitude, etc. |
+| books              | 52   | Pride and Prejudice, Treasure Island, Longitude, etc. |
 | genres             | 7    | Classics, Mystery, Science Fiction, History, etc.     |
 | customers          | 10   | International customers                               |
 | orders             | 15   | Purchase records                                      |
-| order_items        | 29   | Individual book purchases                             |
+| order_items        | 98   | Individual book purchases                             |
 | reading_lists      | 3    | Summer Reading, Classic Mysteries, Book Club Picks    |
-| reading_list_books | 15   | Reading list memberships                              |
+| reading_list_books | 20   | Reading list memberships                              |
 
 ### 3. Run the tests (no API key needed)
 

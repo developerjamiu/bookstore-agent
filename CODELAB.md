@@ -595,17 +595,7 @@ What each function does:
 
 ## Step 4: Build the Research Agent
 
-This is the core of the codelab. In Genkit, a flow is a named AI function with typed input and output. Here it takes a `String` question and returns a `ResearchResult` (the two `Never` types are for streaming, unused here). The agent works in two phases.
-
-**Phase 1 (research):** One `generate` call runs the whole tool loop you saw in How the Agent Works, until the model has enough information. `maxTurns` caps the loop at 10 rounds of tool calls. Reaching the cap does not throw: Genkit stops and returns everything that happened so far, with no final reply.
-
-**The no-query rule:** if `runQuery` never ran, there are no results to summarize. The agent skips Phase 2 and returns the model's Phase 1 reply with `low` confidence and no sources. That's how a weather question gets a polite refusal. If the model ran out of turns without replying, the agent says it couldn't finish.
-
-**Phase 2 (synthesis):** `buildResearchNotes` collects the query results and the model's reply from Phase 1, and a second `generate` call turns them into a `ResearchOutput`. `outputSchema: ResearchOutput.$schema` asks the model for JSON in exactly that shape, and Genkit parses it into a typed Dart object. If the reply doesn't match the schema, `response.output` is `null` and the agent throws, so the route answers with an error instead of a made-up answer.
-
-**Checking for failures:** Genkit 1.0 reports a failed model call in the result instead of throwing. `_throwIfFailed` checks each result and throws, so the route in Step 6 can turn the failure into an HTTP error.
-
-> **Why two phases?** Gemini can take tools and a fixed answer format (`outputSchema`) in one call, but only as a preview feature. When we tried one call with both, the model kept calling tools and never answered. Two separate calls give each step one simple job, which is more reliable.
+Now put the pieces together. The agent uses your tools to research a question (Phase 1), then writes the answer from the notes your helpers build (Phase 2).
 
 Create `packages/dart_server/lib/src/agent/research_agent.dart`:
 
@@ -704,12 +694,9 @@ class ResearchAgent {
     );
   }
 
-  /// Runs the tool loop.
-  ///
-  /// When the loop reaches `maxTurns`, Genkit returns a result with
-  /// `finishReason: aborted` that keeps the messages so far, instead of
-  /// throwing. A cancel also ends as aborted, but this agent passes no
-  /// cancellation token, so here aborted always means the turn limit.
+  /// Phase 1: the model calls tools until it can answer, up to
+  /// [_maxTurns] times. Hitting the limit doesn't throw. Genkit returns
+  /// everything that happened so far.
   Future<GenerateResult> _runResearchPhase(String question) async {
     final response = await _ai.generate(
       model: _model,
@@ -746,12 +733,10 @@ class ResearchAgent {
     return output;
   }
 
-  /// Throws when [response] reports a failed generation.
+  /// Throws if the model call failed.
   ///
-  /// Genkit 1.0 no longer throws when the model or a tool fails. It returns
-  /// a result with `finishReason: failed`, the thrown object as `cause` and
-  /// a structured `error`. Rethrowing keeps the route's error handling, which
-  /// maps a [GenkitException] status to an HTTP status.
+  /// Genkit 1.0 reports failures in the result instead of throwing, so this
+  /// turns them back into an error the route can send as an HTTP error.
   static void _throwIfFailed(GenerateResult response) {
     if (response.finishReason != FinishReason.failed) return;
 
@@ -765,12 +750,17 @@ class ResearchAgent {
 }
 ```
 
-**Key things to notice:**
+How it works:
 
-- `_researchPrompt` tells the model it doesn't know the schema and must never answer from its own knowledge. That is what makes it explore, and say so when the data can't answer
-- In the research call, `system:` holds the instructions, `prompt:` the user's question, and `tools:` the three tools
-- `extractToolCalls` and `buildResearchNotes` come from the helpers you built in Step 3
-- `model` is injectable: tests swap in a fake, production uses `gemini-3.5-flash-lite`
+- **The prompt:** `_researchPrompt` tells the model it doesn't know the database and must answer only from query results. That is what makes it explore.
+- **Phase 1:** `_runResearchPhase` makes one `generate` call with your three tools. Gemini keeps calling tools until it can answer, up to 10 times.
+- **No query, no Phase 2:** if the model never called `runQuery`, nothing came from the database. The agent returns the model's reply with `low` confidence, which is how a weather question gets a polite refusal.
+- **Phase 2:** `_runSynthesisPhase` sends the notes to Gemini with `outputSchema`, so the answer comes back as a `ResearchOutput`.
+- **Errors:** `_throwIfFailed` turns a failed model call into an error, which the route sends back as an HTTP error in Step 6.
+
+`call()` wraps `research` in a Genkit flow, the function the route will run.
+
+> **Why two calls?** Gemini can combine tools and a fixed answer format only as a preview feature. When we tried it, the model kept calling tools and never answered.
 
 **Verify:** `dart analyze` prints `No issues found!`
 

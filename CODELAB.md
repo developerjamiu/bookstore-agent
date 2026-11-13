@@ -9,15 +9,15 @@ This is not a chatbot. It's an **agent** — an LLM that sits in a loop, picks t
 - Defining typed schemas with Schemantic for tool inputs and structured output
 - Creating Genkit tools with `ai.defineTool()`
 - Building an agentic flow with a tool-calling loop and `maxTurns`
-- Working around Gemini's limitation of tools + outputSchema with two-phase generate
+- Splitting the work into two `generate` calls: one that uses tools, one that returns structured output
 - Wiring everything together with constructor dependency injection
 
 **Time:** ~30 minutes
 
 **Prerequisites:**
 
-- [Dart SDK](https://dart.dev/get-dart) >= 3.11
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) >= 3.27
+- [Dart SDK](https://dart.dev/get-dart) >= 3.12
+- A [Flutter SDK](https://docs.flutter.dev/get-started/install) that bundles Dart 3.12 or later
 - A Google AI API key ([get one free](https://aistudio.google.com/apikey))
 
 ---
@@ -103,7 +103,7 @@ The agent decides which tool to call, in what order, and when to stop. A typical
 
 This loop - think, act, observe, repeat - is what makes it an agent. The model chooses every step.
 
-After the tool loop finishes, a second LLM call takes the query results and produces a structured JSON answer with the text, sources (the SQL queries), and a confidence level. This two-call approach is needed because Gemini doesn't support tools and structured output in the same request.
+After the tool loop finishes, if the agent ran at least one query, a second LLM call takes the query results and produces a structured JSON answer with the text, sources (the SQL queries), and a confidence level. Gemini can take tools and a fixed answer format in one call only as a preview feature, and in testing the model kept calling tools without answering. So the agent keeps the research and the structured answer in two separate calls.
 
 Here's what you'll build to make this work:
 
@@ -246,9 +246,11 @@ abstract class $ResearchResult {
 
 ### Generate the code
 
+The code generator, `schemantic_builder`, is already a dev dependency in `packages/dart_server/pubspec.yaml`. Run it from the server package:
+
 ```sh
 cd packages/dart_server
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 ```
 
 This generates a `.g.dart` file next to each schema with constructors, `fromJson`, `toJson`, and a `$schema` constant for use with Genkit.
@@ -260,6 +262,11 @@ This generates a `.g.dart` file next to each schema with constructors, `fromJson
 ## Step 2: Build the Database Tools
 
 Each tool follows the same pattern: a class with constructor DI, a `call()` method that registers with Genkit, and a public logic method that's testable without Genkit.
+
+Two things in the code are new in recent Dart and Genkit:
+
+- `required this._ai` fills the private field `_ai` straight from a named parameter. Dart 3.12 allows this for private fields, and callers still write `ai:`.
+- A tool function returns its result wrapped as `.response(...)`. That is short for `ToolResult.response(...)`, the type Genkit 1.0 expects a tool to return.
 
 ### ListTablesTool
 
@@ -277,9 +284,7 @@ class ListTablesTool {
   final Genkit _ai;
   final Database _db;
 
-  ListTablesTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  ListTablesTool({required this._ai, required this._db});
 
   Tool<void, String> call() {
     return _ai.defineTool(
@@ -289,7 +294,7 @@ class ListTablesTool {
           'what data is available before writing any queries.',
       inputSchema: SchemanticType.voidSchema(),
       outputSchema: SchemanticType.string(),
-      fn: (_, _) => list(),
+      fn: (_, _) async => .response(await list()),
     );
   }
 
@@ -336,9 +341,7 @@ class DescribeTableTool {
   final Genkit _ai;
   final Database _db;
 
-  DescribeTableTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  DescribeTableTool({required this._ai, required this._db});
 
   Tool<TableNameInput, String> call() {
     return _ai.defineTool(
@@ -348,7 +351,7 @@ class DescribeTableTool {
           'to understand the schema before writing a query.',
       inputSchema: TableNameInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => describe(input),
+      fn: (input, _) async => .response(await describe(input)),
     );
   }
 
@@ -421,9 +424,7 @@ class RunQueryTool {
   final Genkit _ai;
   final Database _db;
 
-  RunQueryTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  RunQueryTool({required this._ai, required this._db});
 
   Tool<SqlQueryInput, String> call() {
     return _ai.defineTool(
@@ -434,7 +435,7 @@ class RunQueryTool {
           'SELECT statements are allowed.',
       inputSchema: SqlQueryInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) => query(input),
+      fn: (input, _) async => .response(await query(input)),
     );
   }
 
@@ -480,6 +481,8 @@ class RunQueryTool {
 
 When the agent finishes its tool-calling loop, we need to extract two things from the conversation: what tools were called (for the UI trace), and what query results came back (for the synthesis phase).
 
+Both helpers work with a `GenerateResult`, the object `ai.generate()` returns. Its `messages` hold the whole conversation, including every tool request and tool response, and its `text` holds the model's final reply. `extractToolCalls` takes the `messages`, and `buildResearchNotes` takes the whole result. A tool with no input, like `listTables`, is recorded with `{}` as its input.
+
 Create `packages/dart_server/lib/src/utils/message_helpers.dart`:
 
 ````dart
@@ -503,10 +506,12 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
       final toolRequestPart = part.toolRequestPart;
       if (toolRequestPart == null) continue;
       final request = toolRequestPart.toolRequest;
+      final input = request.input;
       calls.add(
         ToolCall(
           tool: request.name,
-          input: jsonEncode(request.input ?? const <String, dynamic>{}),
+          // A tool with no input can arrive as null or "NULL": record "{}".
+          input: jsonEncode(input is Map ? input : const <String, dynamic>{}),
         ),
       );
     }
@@ -526,7 +531,7 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
 /// [Agent summary]
 /// The database contains 15 artists.
 /// ```
-String buildResearchNotes(GenerateResponseHelper response) {
+String buildResearchNotes(GenerateResult response) {
   final buffer = StringBuffer();
 
   for (final message in response.messages) {
@@ -570,8 +575,10 @@ String? _findQueryForResponse(
       if (request == null) continue;
       if (request.toolRequest.ref == toolResponse.ref &&
           request.toolRequest.name == 'runQuery') {
-        final input = request.toolRequest.input;
-        return input?['sql'] as String?;
+        if (request.toolRequest.input case {'sql': final String sql}) {
+          return sql;
+        }
+        return null;
       }
     }
   }
@@ -585,13 +592,17 @@ String? _findQueryForResponse(
 
 ## Step 4: Build the Research Agent
 
-This is the core of the codelab — the agentic flow with two phases.
+This is the core of the codelab: the agentic flow. It answers a question in two phases.
 
-**Phase 1 - Research:** The model gets the user's question and three tools. It autonomously decides to call `listTables` first, then `describeTable` on relevant tables, then `runQuery` to fetch data. It loops up to `maxTurns: 10` and stops when it has enough information.
+**Phase 1 - Research:** One `generate` call runs the whole tool loop. `system:` holds the instructions, `prompt:` holds the user's question, and `tools:` lists the three tools. The model asks for a tool, Genkit runs it and sends the result back, and the model decides what to do next. It usually starts with `listTables`, then calls `describeTable` on the tables it needs, then `runQuery` to fetch data. It stops when it has enough information. `maxTurns: _maxTurns` caps the loop at 10 rounds of tool calls. Reaching the cap is not an error: Genkit stops the loop and returns everything that happened so far.
 
-**Phase 2 - Synthesis:** The model gets the query results from phase 1 and produces a structured `ResearchOutput` via `outputSchema`.
+**The no-query rule:** Next, the agent checks whether `runQuery` ran at least once. If it did not, nothing came from the database, so there are no results to summarize. The agent skips Phase 2 and returns the model's reply from Phase 1 with `low` confidence and no sources. That is how an out-of-scope question, like the weather, gets a polite refusal. If the model ran out of turns before writing any reply, the agent says it couldn't finish researching instead. When at least one query did run, the agent always goes on to Phase 2, so the answer comes from real query results.
 
-> **Why two phases?** Gemini doesn't support `tools` + `outputSchema` in the same API call. This is a known limitation.
+**Phase 2 - Synthesis:** `buildResearchNotes` collects the query results from Phase 1, and a second `generate` call turns them into a `ResearchOutput`. `outputSchema: ResearchOutput.$schema` asks the model for JSON in exactly that shape, and Genkit parses it into a typed Dart object. If the reply doesn't match the schema, `response.output` is `null` and the agent throws, so the route answers with an error instead of a made-up answer.
+
+**Checking for failures:** Genkit 1.0 reports a failed model call in the result instead of throwing, so `_throwIfFailed` checks each result and throws when the call failed.
+
+> **Why two phases?** Gemini can take tools and a fixed answer format (`outputSchema`) in one call, but only as a preview feature. In testing, the model kept calling tools and never answered. Keeping the research and the structured answer in separate calls makes both reliable.
 
 Create `packages/dart_server/lib/src/agent/research_agent.dart`:
 
@@ -616,12 +627,18 @@ class ResearchAgent {
       '- describeTable: see the columns and foreign keys of a table\n'
       '- runQuery: execute a read-only SQL SELECT query\n\n'
       'Strategy:\n'
-      '1. ALWAYS start by calling listTables — every question, no exceptions.\n'
+      '1. Use listTables to discover what tables exist.\n'
       '2. Call describeTable on relevant tables to understand columns and joins.\n'
       '3. Write and run SQL queries to find the answer.\n'
       '4. If a query returns unexpected results, try a different approach.\n'
       '5. If the question cannot be answered with the available data, say so.\n\n'
       'NEVER answer from your own knowledge. All answers must come from query results.';
+
+  static const _maxTurns = 10;
+
+  static const _outOfTurnsAnswer =
+      "I couldn't finish researching this question within the allowed "
+      'steps. Try asking something more specific.';
 
   static const _synthesisPrompt =
       'You are a database analyst. Using ONLY the research notes below, '
@@ -631,7 +648,9 @@ class ResearchAgent {
       'question, "medium" if partially, "low" if the data was not found.\n'
       '- In the sources array, include the SQL queries from the notes '
       'that produced the key results (the SELECT statements).\n'
-      '- Write a clear, natural-language answer that interprets the data.';
+      '- Write a clear, natural-language answer that interprets the data.\n'
+      '- When listing items such as tracks, name each distinct item once and '
+      'give a count when it appears more than once.';
 
   final Genkit _ai;
   final ModelRef<GeminiOptions> _model;
@@ -640,16 +659,12 @@ class ResearchAgent {
   final Tool<SqlQueryInput, String> _runQueryTool;
 
   ResearchAgent({
-    required Genkit ai,
+    required this._ai,
     ModelRef<GeminiOptions>? model,
-    required Tool<void, String> listTablesTool,
-    required Tool<TableNameInput, String> describeTableTool,
-    required Tool<SqlQueryInput, String> runQueryTool,
-  }) : _ai = ai,
-       _model = model ?? googleAI.gemini('gemini-2.5-flash'),
-       _listTablesTool = listTablesTool,
-       _describeTableTool = describeTableTool,
-       _runQueryTool = runQueryTool;
+    required this._listTablesTool,
+    required this._describeTableTool,
+    required this._runQueryTool,
+  }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
   Flow<String, ResearchResult, Never, Never> call() {
     return _ai.defineFlow(
@@ -661,12 +676,23 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    final researchResponse = await _runResearchPhase(question);
-    final toolCalls = extractToolCalls(researchResponse.messages);
-    final notes = buildResearchNotes(researchResponse);
+    final research = await _runResearchPhase(question);
+    final toolCalls = extractToolCalls(research.messages);
 
+    // No query ran, so nothing came from the database: answer with low
+    // confidence. That covers out-of-scope questions and an agent that ran
+    // out of turns before querying.
+    if (!toolCalls.any((call) => call.tool == 'runQuery')) {
+      return ResearchResult(
+        answer: research.text.isNotEmpty ? research.text : _outOfTurnsAnswer,
+        sources: const [],
+        confidence: 'low',
+        toolCalls: toolCalls,
+      );
+    }
+
+    final notes = buildResearchNotes(research);
     final synthesis = await _runSynthesisPhase(question, notes);
-
     return ResearchResult(
       answer: synthesis.answer,
       sources: synthesis.sources,
@@ -675,41 +701,22 @@ class ResearchAgent {
     );
   }
 
-  Future<GenerateResponseHelper> _runResearchPhase(String question) async {
-    try {
-      return await _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [TextPart(text: _researchPrompt)],
-          ),
-          Message(role: Role.user, content: [TextPart(text: question)]),
-        ],
-        tools: [_listTablesTool, _describeTableTool, _runQueryTool],
-        maxTurns: 10,
-      );
-    } on GenkitException catch (e) {
-      if (!e.message.contains('max turns')) rethrow;
-
-      return _ai.generate(
-        model: _model,
-        messages: [
-          Message(
-            role: Role.system,
-            content: [
-              TextPart(
-                text:
-                    'You ran out of tool-calling turns. Summarize what you '
-                    'learned from the query results below. Do not call any '
-                    'more tools.',
-              ),
-            ],
-          ),
-          Message(role: Role.user, content: [TextPart(text: question)]),
-        ],
-      );
-    }
+  /// Runs the tool loop.
+  ///
+  /// When the loop reaches `maxTurns`, Genkit returns a result with
+  /// `finishReason: aborted` that keeps the messages so far, instead of
+  /// throwing. A cancel also ends as aborted, but this agent passes no
+  /// cancellation token, so here aborted always means the turn limit.
+  Future<GenerateResult> _runResearchPhase(String question) async {
+    final response = await _ai.generate(
+      model: _model,
+      system: _researchPrompt,
+      prompt: question,
+      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
+      maxTurns: _maxTurns,
+    );
+    _throwIfFailed(response);
+    return response;
   }
 
   Future<ResearchOutput> _runSynthesisPhase(
@@ -718,37 +725,49 @@ class ResearchAgent {
   ) async {
     final response = await _ai.generate(
       model: _model,
-      messages: [
-        Message(
-          role: Role.system,
-          content: [TextPart(text: _synthesisPrompt)],
-        ),
-        Message(
-          role: Role.user,
-          content: [
-            TextPart(text: 'Question: $question\n\nResearch notes:\n$notes'),
-          ],
-        ),
-      ],
+      system: _synthesisPrompt,
+      prompt: 'Question: $question\n\nResearch notes:\n$notes',
       outputSchema: ResearchOutput.$schema,
     );
+    _throwIfFailed(response);
 
-    return response.output ??
-        ResearchOutput(
-          answer: 'I was unable to produce a structured answer.',
-          sources: const [],
-          confidence: 'low',
-        );
+    // A reply that does not match the schema comes back as an error on the
+    // result instead of a throw. Fail here so the route answers 500.
+    final output = response.output;
+    if (output == null) {
+      throw GenkitException(
+        response.error?.message ?? 'The model returned no structured answer.',
+        cause: response.cause,
+      );
+    }
+    return output;
+  }
+
+  /// Throws when [response] reports a failed generation.
+  ///
+  /// Genkit 1.0 no longer throws when the model or a tool fails. It returns
+  /// a result with `finishReason: failed`, the thrown object as `cause` and
+  /// a structured `error`. Rethrowing keeps the route's error handling, which
+  /// maps a [GenkitException] status to an HTTP status.
+  static void _throwIfFailed(GenerateResult response) {
+    if (response.finishReason != FinishReason.failed) return;
+
+    final cause = response.cause;
+    if (cause is GenkitException) throw cause;
+    throw GenkitException(
+      response.error?.message ?? 'Generation failed.',
+      cause: cause,
+    );
   }
 }
 ```
 
 **Key things to notice:**
 
-- `maxTurns: 10` — the model can call tools up to 10 times before Genkit stops it
-- The catch block handles the "max turns" case gracefully
-- `extractToolCalls` and `buildResearchNotes` come from the helpers you built in Step 4
-- `model` is injectable — tests swap in a fake, production uses Gemini
+- `research()` reads top to bottom: the research phase, the no-query rule, then the synthesis phase
+- `_maxTurns` and `_outOfTurnsAnswer` are constants at the top of the class, so the turn limit and the fallback answer are easy to find
+- `extractToolCalls` and `buildResearchNotes` come from the helpers you built in Step 3
+- `model` is injectable: tests swap in a fake, production uses `gemini-3.5-flash-lite`
 
 ---
 
@@ -772,9 +791,7 @@ class AISetup {
   final Genkit _ai;
   final Database _db;
 
-  AISetup({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  AISetup({required this._ai, required this._db});
 
   Flow<String, ResearchResult, Never, Never> call() {
     final listTablesTool = ListTablesTool(ai: _ai, db: _db);
@@ -811,8 +828,7 @@ typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 class ResearchRoutes {
   final ResearchFlow _researchFlow;
 
-  ResearchRoutes({required ResearchFlow researchFlow})
-    : _researchFlow = researchFlow;
+  ResearchRoutes({required this._researchFlow});
 
   RelicRouter get router {
     final router = RelicRouter();
@@ -842,7 +858,7 @@ class ResearchRoutes {
 }
 ```
 
-The `RelicRouter` and the request validation stay as they were in the placeholder. A `RelicRouter` maps a method and a path to a handler: `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, for example a 429 when your API quota runs out.
+The `RelicRouter` and the request validation stay as they were in the placeholder. A `RelicRouter` maps a method and a path to a handler: `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, which is pre-built in `request_helpers.dart`. Every `GenkitException` carries a typed `status`, a `StatusCode` value, and the helper maps it to an HTTP status: `resourceExhausted` (your API quota ran out) becomes 429, `unavailable` (the model is overloaded) becomes 503, and anything else becomes 500.
 
 Until you update the entrypoint in Step 7, `dart analyze` reports a missing `researchFlow` argument in `bin/server.dart`. That is expected.
 

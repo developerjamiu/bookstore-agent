@@ -189,11 +189,6 @@ You'll see:
 
 ```
 Server running on http://localhost:8080
-
-Try it:
-  curl -s http://localhost:8080/api/research \
-    -H "Content-Type: application/json" \
-    -d '{"question":"Which genre has the most tracks?"}' | jq
 ```
 
 The server listens on port 8080 because the Flutter client calls

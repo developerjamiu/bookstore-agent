@@ -1,11 +1,10 @@
-import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart';
+import 'package:relic/relic.dart';
 
 import '../utils/request_helpers.dart';
 
 class ResearchRoutes {
-  Router get router {
-    final router = Router();
+  RelicRouter get router {
+    final router = RelicRouter();
     router.post('/api/research', _research);
     return router;
   }
@@ -21,7 +20,8 @@ class ResearchRoutes {
 
     // TODO: Replace this placeholder with a real agent flow.
     return jsonResponse({
-      'answer': 'This is a placeholder. Complete the codelab to power this '
+      'answer':
+          'This is a placeholder. Complete the codelab to power this '
           'with a real AI agent that explores the music store database!',
       'sources': <String>[],
       'confidence': 'low',

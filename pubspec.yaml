@@ -5,5 +5,5 @@ environment:
   sdk: ^3.11.0
 
 workspace:
-  - packages/server
+  - packages/dart_server
   - packages/client

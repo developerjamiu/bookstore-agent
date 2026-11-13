@@ -103,7 +103,7 @@ The agent decides which tool to call, in what order, and when to stop. A typical
 
 This loop - think, act, observe, repeat - is what makes it an agent. The model chooses every step.
 
-After the tool loop finishes, if the agent ran at least one query, a second LLM call takes the query results and produces a structured JSON answer with the text, sources (the SQL queries), and a confidence level. Gemini can take tools and a fixed answer format in one call only as a preview feature, and in testing the model kept calling tools without answering. So the agent keeps the research and the structured answer in two separate calls.
+After the tool loop finishes, if the agent ran at least one query, a second LLM call takes the query results and produces a structured JSON answer with the text, sources (the SQL queries), and a confidence level. Keeping these as two separate calls makes each one simpler and more reliable. Step 4 explains why.
 
 Here's what you'll build to make this work:
 
@@ -123,7 +123,7 @@ agent/research_agent.dart
     |   |-- runQuery
     |   (model picks which tool, sees result, picks again)
     |
-    |-- Phase 2: synthesis (outputSchema: ResearchOutput)
+    |-- Phase 2: synthesis (outputSchema: ResearchOutput), only if a query ran
     |   (structured JSON from the research notes)
     |
     v
@@ -266,7 +266,7 @@ Each tool follows the same pattern: a class with constructor DI, a `call()` meth
 Two things in the code are new in recent Dart and Genkit:
 
 - `required this._ai` fills the private field `_ai` straight from a named parameter. Dart 3.12 allows this for private fields, and callers still write `ai:`.
-- A tool function returns its result wrapped as `.response(...)`. That is short for `ToolResult.response(...)`, the type Genkit 1.0 expects a tool to return.
+- Genkit 1.0 expects a tool function to return a `ToolResult`. `.response(...)` is short for `ToolResult.response(...)`: Dart lets you drop the class name when it already knows the return type.
 
 ### ListTablesTool
 
@@ -594,15 +594,15 @@ String? _findQueryForResponse(
 
 This is the core of the codelab: the agentic flow. It answers a question in two phases.
 
-**Phase 1 - Research:** One `generate` call runs the whole tool loop. `system:` holds the instructions, `prompt:` holds the user's question, and `tools:` lists the three tools. The model asks for a tool, Genkit runs it and sends the result back, and the model decides what to do next. It usually starts with `listTables`, then calls `describeTable` on the tables it needs, then `runQuery` to fetch data. It stops when it has enough information. `maxTurns: _maxTurns` caps the loop at 10 rounds of tool calls. Reaching the cap is not an error: Genkit stops the loop and returns everything that happened so far.
+**Phase 1 - Research:** One `generate` call runs the whole tool loop. The model asks for a tool, Genkit runs it and sends back the result, and the model decides what to do next, until it has enough information. `maxTurns` caps the loop at 10 rounds of tool calls. Reaching the cap is not an error: Genkit stops and returns everything that happened so far.
 
-**The no-query rule:** Next, the agent checks whether `runQuery` ran at least once. If it did not, nothing came from the database, so there are no results to summarize. The agent skips Phase 2 and returns the model's reply from Phase 1 with `low` confidence and no sources. That is how an out-of-scope question, like the weather, gets a polite refusal. If the model ran out of turns before writing any reply, the agent says it couldn't finish researching instead. When at least one query did run, the agent always goes on to Phase 2, so the answer comes from real query results.
+**The no-query rule:** Next, the agent checks whether `runQuery` ran at least once. If it did not, there are no query results to summarize. The agent skips Phase 2 and returns the model's reply from Phase 1 with `low` confidence and no sources. That is how an out-of-scope question, like the weather, gets a polite refusal. If the model ran out of turns before writing any reply, the agent says it couldn't finish researching instead. When at least one query did run, the agent always goes on to Phase 2, so the answer comes from real query results.
 
-**Phase 2 - Synthesis:** `buildResearchNotes` collects the query results from Phase 1, and a second `generate` call turns them into a `ResearchOutput`. `outputSchema: ResearchOutput.$schema` asks the model for JSON in exactly that shape, and Genkit parses it into a typed Dart object. If the reply doesn't match the schema, `response.output` is `null` and the agent throws, so the route answers with an error instead of a made-up answer.
+**Phase 2 - Synthesis:** `buildResearchNotes` collects the query results and the model's reply from Phase 1, and a second `generate` call turns them into a `ResearchOutput`. `outputSchema: ResearchOutput.$schema` asks the model for JSON in exactly that shape, and Genkit parses it into a typed Dart object. If the reply doesn't match the schema, `response.output` is `null` and the agent throws, so the route answers with an error instead of a made-up answer.
 
-**Checking for failures:** Genkit 1.0 reports a failed model call in the result instead of throwing, so `_throwIfFailed` checks each result and throws when the call failed.
+**Checking for failures:** Genkit 1.0 reports a failed model call in the result instead of throwing. `_throwIfFailed` checks each result and throws, so the route in Step 6 can turn the failure into an HTTP error.
 
-> **Why two phases?** Gemini can take tools and a fixed answer format (`outputSchema`) in one call, but only as a preview feature. In testing, the model kept calling tools and never answered. Keeping the research and the structured answer in separate calls makes both reliable.
+> **Why two phases?** Gemini can take tools and a fixed answer format (`outputSchema`) in one call, but only as a preview feature. When we tried one call with both, the model kept calling tools and never answered. Two separate calls give each step one simple job, which is more reliable.
 
 Create `packages/dart_server/lib/src/agent/research_agent.dart`:
 
@@ -765,7 +765,8 @@ class ResearchAgent {
 **Key things to notice:**
 
 - `research()` reads top to bottom: the research phase, the no-query rule, then the synthesis phase
-- `_maxTurns` and `_outOfTurnsAnswer` are constants at the top of the class, so the turn limit and the fallback answer are easy to find
+- In the research call, `system:` holds the instructions, `prompt:` the user's question, and `tools:` the three tools
+- `_maxTurns` and `_outOfTurnsAnswer` are named constants next to the prompts, so the turn limit and the fallback answer are easy to find and change
 - `extractToolCalls` and `buildResearchNotes` come from the helpers you built in Step 3
 - `model` is injectable: tests swap in a fake, production uses `gemini-3.5-flash-lite`
 
@@ -858,7 +859,7 @@ class ResearchRoutes {
 }
 ```
 
-The `RelicRouter` and the request validation stay as they were in the placeholder. A `RelicRouter` maps a method and a path to a handler: `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, which is pre-built in `request_helpers.dart`. Every `GenkitException` carries a typed `status`, a `StatusCode` value, and the helper maps it to an HTTP status: `resourceExhausted` (your API quota ran out) becomes 429, `unavailable` (the model is overloaded) becomes 503, and anything else becomes 500.
+The `RelicRouter` and the request validation stay as they were in the placeholder. A `RelicRouter` maps a method and a path to a handler: `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, which is pre-built in `request_helpers.dart`. Every `GenkitException` has a `status` of type `StatusCode`, and the helper maps it to an HTTP status: `resourceExhausted` (your API quota ran out) becomes 429, `unavailable` (the model is overloaded) becomes 503, and anything else becomes 500.
 
 Until you update the entrypoint in Step 7, `dart analyze` reports a missing `researchFlow` argument in `bin/server.dart`. That is expected.
 

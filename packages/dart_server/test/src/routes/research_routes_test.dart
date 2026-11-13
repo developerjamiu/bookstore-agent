@@ -258,7 +258,7 @@ void main() {
           listTablesTool: tool('listTables', SchemanticType.voidSchema()),
           describeTableTool: tool('describeTable', TableNameInput.$schema),
           runQueryTool: tool('runQuery', SqlQueryInput.$schema),
-        )();
+        ).define();
       }
 
       ModelResponse text(String text) => ModelResponse(
@@ -269,10 +269,10 @@ void main() {
         ),
       );
 
-      /// A research turn that runs one query, then finishes once it has a result.
-      ModelResponse queryThenDone(ModelRequest request) {
+      /// Runs one query, then replies with [finalText] once it has a result.
+      ModelResponse queryThen(ModelRequest request, String finalText) {
         if (request.messages.any((m) => m.role == Role.tool)) {
-          return text('Done.');
+          return text(finalText);
         }
         return ModelResponse(
           finishReason: FinishReason.stop,
@@ -330,55 +330,25 @@ void main() {
         );
       });
 
-      test(
-        'answers 429 when only the research phase exhausts the quota',
-        () async {
-          final response = await send(
-            Method.post,
-            body: _json({'question': 'How many artists are there?'}),
-            flow: agentFlow((request) async {
-              if (request.output != null) {
-                return text(
-                  '{"answer": "x", "sources": [], "confidence": "low"}',
-                );
-              }
-              throw GenkitException(
-                'Quota exceeded for this model.',
-                status: StatusCode.resourceExhausted,
-              );
-            }),
-          );
-
-          await expectJsonError(
-            response,
-            429,
-            'API quota exceeded. Please try again later.',
-          );
-          expect(printed.single, contains('Quota exceeded'));
-        },
-      );
-
       test('answers 500 when a tool fails during research', () async {
         final response = await send(
           Method.post,
           body: _json({'question': 'How many artists are there?'}),
           flow: agentFlow(
-            (request) async => request.output != null
-                ? text('{"answer": "x", "sources": [], "confidence": "low"}')
-                : ModelResponse(
-                    finishReason: FinishReason.stop,
-                    message: Message(
-                      role: Role.model,
-                      content: [
-                        ToolRequestPart(
-                          toolRequest: ToolRequest(
-                            name: 'runQuery',
-                            input: const {'sql': 'SELECT 1'},
-                          ),
-                        ),
-                      ],
+            (request) async => ModelResponse(
+              finishReason: FinishReason.stop,
+              message: Message(
+                role: Role.model,
+                content: [
+                  ToolRequestPart(
+                    toolRequest: ToolRequest(
+                      name: 'runQuery',
+                      input: const {'sql': 'SELECT 1'},
                     ),
                   ),
+                ],
+              ),
+            ),
             runQuery: () async => throw StateError('database is locked'),
           ),
         );
@@ -392,14 +362,12 @@ void main() {
         expect(printed.single, contains('tool "runQuery" failed'));
       });
 
-      test('answers 500 when the synthesis reply does not parse', () async {
+      test('answers 500 when the final reply does not parse', () async {
         final response = await send(
           Method.post,
           body: _json({'question': 'How many artists are there?'}),
           flow: agentFlow(
-            (request) async => request.output != null
-                ? text('Sorry, no JSON today.')
-                : queryThenDone(request),
+            (request) async => queryThen(request, 'Sorry, no JSON today.'),
           ),
         );
 
@@ -412,27 +380,22 @@ void main() {
         expect(printed.single, contains('expected schema'));
       });
 
-      test(
-        'answers 500 when the synthesis reply has the wrong shape',
-        () async {
-          final response = await send(
-            Method.post,
-            body: _json({'question': 'How many artists are there?'}),
-            flow: agentFlow(
-              (request) async => request.output != null
-                  ? text('{"answer": 42}')
-                  : queryThenDone(request),
-            ),
-          );
+      test('answers 500 when the final reply has the wrong shape', () async {
+        final response = await send(
+          Method.post,
+          body: _json({'question': 'How many artists are there?'}),
+          flow: agentFlow(
+            (request) async => queryThen(request, '{"answer": 42}'),
+          ),
+        );
 
-          await expectJsonError(
-            response,
-            500,
-            'Agent failed. Check server logs for details.',
-          );
-          expect(printed.single, startsWith('Unexpected error: '));
-        },
-      );
+        await expectJsonError(
+          response,
+          500,
+          'Agent failed. Check server logs for details.',
+        );
+        expect(printed.single, startsWith('Unexpected error: '));
+      });
     });
 
     test('answers 500 when the flow throws any other error', () async {

@@ -17,7 +17,7 @@ class DescribeTableTool {
 
   DescribeTableTool({required this._ai, required this._db});
 
-  Tool<TableNameInput, String> call() {
+  Tool<TableNameInput, String> define() {
     return _ai.defineTool(
       name: 'describeTable',
       description:

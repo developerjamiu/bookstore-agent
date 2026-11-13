@@ -55,7 +55,7 @@ base class _TableNameInputTypeFactory extends SchemanticType<TableNameInput> {
     name: 'TableNameInput',
     definition: <String, Object?>{
       'type': 'object',
-      'description': 'Input specifying a database table to inspect',
+      'description': 'Which table to look at',
       'properties': <String, Object?>{
         'table': <String, Object?>{
           'type': 'string',

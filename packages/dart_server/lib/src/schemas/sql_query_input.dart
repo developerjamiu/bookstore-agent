@@ -2,7 +2,7 @@ import 'package:schemantic/schemantic.dart';
 
 part 'sql_query_input.g.dart';
 
-@Schema(description: 'A SQL query to execute against the database')
+@Schema(description: 'The SQL query to run')
 abstract class $SqlQueryInput {
   @StringField(
     description:

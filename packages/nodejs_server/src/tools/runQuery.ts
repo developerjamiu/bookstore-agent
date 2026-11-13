@@ -9,8 +9,8 @@ export function createRunQueryTool(ai: Genkit, db: Database) {
     {
       name: 'runQuery',
       description:
-        'Execute a read-only SQL SELECT query and return the results ' +
-        'as a formatted table. Returns up to ' +
+        'Execute a read-only SQL SELECT query and return the rows ' +
+        'as JSON. Returns up to ' +
         MAX_ROWS +
         ' rows. Only SELECT statements are allowed.',
       inputSchema: z.object({

@@ -45,6 +45,6 @@ server.listen(port, host, () => {
   console.log('Try it:');
   console.log(`  curl -s http://localhost:${port}/api/research \\`);
   console.log('    -H "Content-Type: application/json" \\');
-  console.log('    -d \'{"question":"Which genre has the most tracks?"}\' | jq');
+  console.log('    -d \'{"question":"Which genre has the most tracks?"}\'');
   console.log('');
 });

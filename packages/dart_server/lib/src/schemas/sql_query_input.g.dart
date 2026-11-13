@@ -55,11 +55,12 @@ base class _SqlQueryInputTypeFactory extends SchemanticType<SqlQueryInput> {
     name: 'SqlQueryInput',
     definition: <String, Object?>{
       'type': 'object',
-      'description': 'A SQL query to execute against the database',
+      'description': 'The SQL query to run',
       'properties': <String, Object?>{
         'sql': <String, Object?>{
           'type': 'string',
-          'description': 'A read-only SQL SELECT statement. No INSERT, UPDATE, DELETE, or DDL statements are allowed.',
+          'description':
+              'A read-only SQL SELECT statement. No INSERT, UPDATE, DELETE, or DDL statements are allowed.',
         },
       },
       'required': ['sql'],

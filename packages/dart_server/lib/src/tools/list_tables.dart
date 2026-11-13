@@ -11,7 +11,7 @@ class ListTablesTool {
 
   ListTablesTool({required this._ai, required this._db});
 
-  Tool<void, String> call() {
+  Tool<void, String> define() {
     return _ai.defineTool(
       name: 'listTables',
       description:

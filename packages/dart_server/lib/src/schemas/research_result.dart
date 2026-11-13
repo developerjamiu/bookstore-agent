@@ -4,9 +4,9 @@ import 'tool_call.dart';
 
 part 'research_result.g.dart';
 
-@Schema(description: 'Final result returned by the research agent flow')
+@Schema(description: 'The answer the server sends back to the app')
 abstract class $ResearchResult {
-  @StringField(description: 'The synthesized answer to the question')
+  @StringField(description: 'The answer to the question')
   String get answer;
 
   @Field(description: 'SQL queries used to produce the answer')
@@ -18,6 +18,6 @@ abstract class $ResearchResult {
   )
   String get confidence;
 
-  @Field(description: 'Tools the agent invoked while researching')
+  @Field(description: 'The tools the agent called, in order')
   List<$ToolCall> get toolCalls;
 }

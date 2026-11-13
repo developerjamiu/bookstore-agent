@@ -8,40 +8,35 @@ import '../schemas/sql_query_input.dart';
 import '../schemas/table_name_input.dart';
 import '../utils/message_helpers.dart';
 
+/// A Genkit flow that takes a question and returns a [ResearchResult].
+typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
+
 class ResearchAgent {
-  static const _researchPrompt =
-      'You are a database analyst agent. You can ONLY answer questions '
-      'by querying the music store database — never use your own knowledge. '
-      'You do NOT know the database schema, so you must discover it using '
-      'the tools provided:\n'
-      '- listTables: discover what tables exist\n'
-      '- describeTable: see the columns and foreign keys of a table\n'
-      '- runQuery: execute a read-only SQL SELECT query\n\n'
-      'Strategy:\n'
-      '1. Use listTables to discover what tables exist.\n'
-      '2. Call describeTable on relevant tables to understand columns and joins.\n'
-      '3. Write and run SQL queries to find the answer.\n'
+  static const _prompt =
+      'You are a database analyst. Answer questions ONLY from the results of '
+      'queries you run on the music store database, never from your own '
+      'knowledge.\n\n'
+      'You do not know the database schema. To answer:\n'
+      '1. Use listTables to see what tables exist.\n'
+      '2. Use describeTable on the relevant tables to learn their columns and joins.\n'
+      '3. Write and run SQL queries with runQuery.\n'
       '4. If a query returns unexpected results, try a different approach.\n'
-      '5. If the question cannot be answered with the available data, say so.\n\n'
-      'NEVER answer from your own knowledge. All answers must come from query results.';
+      '5. If the data cannot answer the question, say so.\n'
+      '6. As soon as your query results answer the question, stop calling '
+      'tools and reply.\n\n'
+      'In your reply:\n'
+      '- answer: interpret the query results clearly. When listing items such '
+      'as tracks, name each distinct item once and give a count when it '
+      'appears more than once.\n'
+      '- sources: the SELECT statements that produced the key results.\n'
+      '- confidence: "high" if the results clearly answer the question, '
+      '"medium" if partially, "low" if the database cannot answer it.';
 
   static const _maxTurns = 10;
 
   static const _outOfTurnsAnswer =
       "I couldn't finish researching this question within the allowed "
       'steps. Try asking something more specific.';
-
-  static const _synthesisPrompt =
-      'You are a database analyst. Using ONLY the research notes below, '
-      'produce a structured answer to the user\'s question.\n\n'
-      'Rules:\n'
-      '- Set confidence to "high" if the query results clearly answer the '
-      'question, "medium" if partially, "low" if the data was not found.\n'
-      '- In the sources array, include the SQL queries from the notes '
-      'that produced the key results (the SELECT statements).\n'
-      '- Write a clear, natural-language answer that interprets the data.\n'
-      '- When listing items such as tracks, name each distinct item once and '
-      'give a count when it appears more than once.';
 
   final Genkit _ai;
   final ModelRef<GeminiOptions> _model;
@@ -57,7 +52,7 @@ class ResearchAgent {
     required this._runQueryTool,
   }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
-  Flow<String, ResearchResult, Never, Never> call() {
+  ResearchFlow define() {
     return _ai.defineFlow(
       name: 'researchFlow',
       inputSchema: SchemanticType.string(),
@@ -67,87 +62,47 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    final research = await _runResearchPhase(question);
-    final toolCalls = extractToolCalls(research.messages);
+    // The model uses the tools as often as it needs, up to _maxTurns
+    // times, then replies in the ResearchOutput shape.
+    final response = await _ai.generate(
+      model: _model,
+      system: _prompt,
+      prompt: question,
+      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
+      outputSchema: ResearchOutput.$schema,
+      maxTurns: _maxTurns,
+    );
+    final toolCalls = extractToolCalls(response.messages);
 
-    // No query ran, so nothing came from the database: answer with low
-    // confidence. That covers out-of-scope questions and an agent that ran
-    // out of turns before querying.
-    if (!toolCalls.any((call) => call.tool == 'runQuery')) {
+    // The model hit the turn limit before it wrote an answer.
+    if (response.finishReason == FinishReason.aborted) {
       return ResearchResult(
-        answer: research.text.isNotEmpty ? research.text : _outOfTurnsAnswer,
+        answer: _outOfTurnsAnswer,
         sources: const [],
         confidence: 'low',
         toolCalls: toolCalls,
       );
     }
 
-    final notes = buildResearchNotes(research);
-    final synthesis = await _runSynthesisPhase(question, notes);
-    return ResearchResult(
-      answer: synthesis.answer,
-      sources: synthesis.sources,
-      confidence: synthesis.confidence,
-      toolCalls: toolCalls,
-    );
-  }
-
-  /// Runs the tool loop.
-  ///
-  /// When the loop reaches `maxTurns`, Genkit returns a result with
-  /// `finishReason: aborted` that keeps the messages so far, instead of
-  /// throwing. A cancel also ends as aborted, but this agent passes no
-  /// cancellation token, so here aborted always means the turn limit.
-  Future<GenerateResult> _runResearchPhase(String question) async {
-    final response = await _ai.generate(
-      model: _model,
-      system: _researchPrompt,
-      prompt: question,
-      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
-      maxTurns: _maxTurns,
-    );
-    _throwIfFailed(response);
-    return response;
-  }
-
-  Future<ResearchOutput> _runSynthesisPhase(
-    String question,
-    String notes,
-  ) async {
-    final response = await _ai.generate(
-      model: _model,
-      system: _synthesisPrompt,
-      prompt: 'Question: $question\n\nResearch notes:\n$notes',
-      outputSchema: ResearchOutput.$schema,
-    );
-    _throwIfFailed(response);
-
-    // A reply that does not match the schema comes back as an error on the
-    // result instead of a throw. Fail here so the route answers 500.
+    // Genkit reports failures in the result instead of throwing.
+    // Throw here so the route answers with an HTTP error.
     final output = response.output;
     if (output == null) {
+      final cause = response.cause;
+      if (cause is GenkitException) throw cause;
       throw GenkitException(
-        response.error?.message ?? 'The model returned no structured answer.',
-        cause: response.cause,
+        response.error?.message ?? 'The model returned no answer.',
+        cause: cause,
       );
     }
-    return output;
-  }
 
-  /// Throws when [response] reports a failed generation.
-  ///
-  /// Genkit 1.0 no longer throws when the model or a tool fails. It returns
-  /// a result with `finishReason: failed`, the thrown object as `cause` and
-  /// a structured `error`. Rethrowing keeps the route's error handling, which
-  /// maps a [GenkitException] status to an HTTP status.
-  static void _throwIfFailed(GenerateResult response) {
-    if (response.finishReason != FinishReason.failed) return;
-
-    final cause = response.cause;
-    if (cause is GenkitException) throw cause;
-    throw GenkitException(
-      response.error?.message ?? 'Generation failed.',
-      cause: cause,
+    // No query ran, so nothing in the answer came from the database.
+    final ranQuery = toolCalls.any((call) => call.tool == 'runQuery');
+    return ResearchResult(
+      answer: output.answer,
+      sources: ranQuery ? output.sources : const [],
+      confidence: ranQuery ? output.confidence : 'low',
+      toolCalls: toolCalls,
     );
   }
 }

@@ -19,21 +19,23 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) with Dart 3.12 or later (check with `flutter --version`)
 - A Google AI API key ([get one free](https://aistudio.google.com/apikey))
+- An iOS Simulator (Xcode) or Android emulator (Android Studio) to run the Flutter app
+- [jq](https://jqlang.org/download/) to format JSON in the terminal
 
 ---
 
 ## Step 0: Get the Starter Project
 
 ```sh
-git clone git@github.com:developerjamiu/music-store-agent.git
+git clone https://github.com/developerjamiu/music-store-agent.git
 cd music-store-agent
 git checkout starter
-dart pub get
+flutter pub get
 ```
 
 ### Explore what you have
 
-The starter project includes a **complete Flutter app** and a **Dart server skeleton**. The server currently returns placeholder data — your job is to build the AI agent that powers it.
+The starter project includes a **complete Flutter app** and a **Dart server skeleton**. The server currently returns placeholder data. Your job is to build the AI agent that powers it.
 
 The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP server framework. Some of it is pre-built scaffolding you won't change: `packages/dart_server/lib/src/middleware/cors.dart` adds CORS headers so browsers can call the API, and `packages/dart_server/lib/src/utils/request_helpers.dart` parses JSON bodies and builds JSON responses.
 
@@ -47,7 +49,7 @@ Open `packages/dart_server/data/music_store.db` in VS Code with the [SQLite View
 dart run packages/dart_server/bin/server.dart
 ```
 
-The server listens on port 8080 because the Flutter client calls `http://localhost:8080` (`http://10.0.2.2:8080` on the Android emulator). To listen on another port, set `PORT`, for example `PORT=8081 dart run packages/dart_server/bin/server.dart`. The client still calls 8080, so use another port only for curl testing.
+It listens on port 8080, where the Flutter app expects it. To try curl on another port, set `PORT`, for example `PORT=8081`.
 
 **Test it with curl:**
 
@@ -68,14 +70,14 @@ You'll see:
 }
 ```
 
-**Run the Flutter app** (in a second terminal):
+**Run the Flutter app.** Start an iOS Simulator or Android emulator first, then in a second terminal run:
 
 ```sh
 cd packages/client
 flutter run
 ```
 
-Type a question and tap **Research**. You'll see the same placeholder. By the end of this codelab, the same UI will show real AI-generated answers with SQL queries and a full tool trace.
+Type a question and tap the send arrow. You'll see the same placeholder. By the end of this codelab, the same screen will show real answers, the SQL queries behind them, and the agent trace.
 
 ---
 

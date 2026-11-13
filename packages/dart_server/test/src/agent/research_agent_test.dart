@@ -100,6 +100,28 @@ void main() {
       expect(toolNames, contains('runQuery'));
     });
 
+    test('does not call a finished research phase cut short', () async {
+      final synthesisRequests = <ModelRequest>[];
+      ai.defineModel(
+        name: 'fake/recording',
+        fn: (request, _) async {
+          if (request.output == null) return _toolCallingResponse(request);
+          synthesisRequests.add(request);
+          return _structuredResponse(request);
+        },
+      );
+
+      await agentFor(
+        'fake/recording',
+      ).research('What artists are in the database?');
+
+      final prompt = synthesisRequests.single.messages
+          .map((m) => m.text)
+          .join('\n');
+      expect(prompt, contains('AC/DC'));
+      expect(prompt, isNot(contains('cut short')));
+    });
+
     test('includes SQL queries in sources', () async {
       final result = await agent.research('What artists are in the database?');
 
@@ -203,6 +225,7 @@ void main() {
         notes,
         isNot(contains('No query results were produced during research.')),
       );
+      expect(notes, contains('Research was cut short before it finished.'));
       expect(result.toolCalls, hasLength(10));
       expect(result.toolCalls.map((c) => c.tool).toSet(), {'runQuery'});
       expect(result.confidence, 'high');

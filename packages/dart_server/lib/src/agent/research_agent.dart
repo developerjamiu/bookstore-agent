@@ -31,6 +31,10 @@ class ResearchAgent {
       "I couldn't finish researching this question within the allowed "
       'steps. Try asking something more specific.';
 
+  static const _cutShortNote =
+      'Research was cut short before it finished. Say which parts of the '
+      'question these notes do not answer.';
+
   static const _synthesisPrompt =
       'You are a database analyst. Using ONLY the research notes below, '
       'produce a structured answer to the user\'s question.\n\n'
@@ -83,7 +87,10 @@ class ResearchAgent {
     }
 
     final notes = buildResearchNotes(researchResponse);
-    final synthesis = await _runSynthesisPhase(question, notes);
+    final synthesis = await _runSynthesisPhase(
+      question,
+      outOfTurns ? '$notes\n$_cutShortNote' : notes,
+    );
 
     // With no query results, nothing in the answer came from the database,
     // so it cannot be confident and has no query to cite. A refusal such as

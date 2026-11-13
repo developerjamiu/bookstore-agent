@@ -48,16 +48,12 @@ class ResearchAgent {
   final Tool<SqlQueryInput, String> _runQueryTool;
 
   ResearchAgent({
-    required Genkit ai,
+    required this._ai,
     ModelRef<GeminiOptions>? model,
-    required Tool<void, String> listTablesTool,
-    required Tool<TableNameInput, String> describeTableTool,
-    required Tool<SqlQueryInput, String> runQueryTool,
-  }) : _ai = ai,
-       _model = model ?? googleAI.gemini('gemini-3.5-flash-lite'),
-       _listTablesTool = listTablesTool,
-       _describeTableTool = describeTableTool,
-       _runQueryTool = runQueryTool;
+    required this._listTablesTool,
+    required this._describeTableTool,
+    required this._runQueryTool,
+  }) : _model = model ?? googleAI.gemini('gemini-3.5-flash-lite');
 
   Flow<String, ResearchResult, Never, Never> call() {
     return _ai.defineFlow(
@@ -105,16 +101,8 @@ class ResearchAgent {
   Future<GenerateResult> _runResearchPhase(String question) async {
     final response = await _ai.generate(
       model: _model,
-      messages: [
-        Message(
-          role: Role.system,
-          content: [TextPart(text: _researchPrompt)],
-        ),
-        Message(
-          role: Role.user,
-          content: [TextPart(text: question)],
-        ),
-      ],
+      system: _researchPrompt,
+      prompt: question,
       tools: [_listTablesTool, _describeTableTool, _runQueryTool],
       maxTurns: _maxTurns,
     );
@@ -128,18 +116,8 @@ class ResearchAgent {
   ) async {
     final response = await _ai.generate(
       model: _model,
-      messages: [
-        Message(
-          role: Role.system,
-          content: [TextPart(text: _synthesisPrompt)],
-        ),
-        Message(
-          role: Role.user,
-          content: [
-            TextPart(text: 'Question: $question\n\nResearch notes:\n$notes'),
-          ],
-        ),
-      ],
+      system: _synthesisPrompt,
+      prompt: 'Question: $question\n\nResearch notes:\n$notes',
       outputSchema: ResearchOutput.$schema,
     );
     _throwIfFailed(response);

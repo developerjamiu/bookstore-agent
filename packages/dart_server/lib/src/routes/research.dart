@@ -9,8 +9,7 @@ typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 class ResearchRoutes {
   final ResearchFlow _researchFlow;
 
-  ResearchRoutes({required ResearchFlow researchFlow})
-    : _researchFlow = researchFlow;
+  ResearchRoutes({required this._researchFlow});
 
   RelicRouter get router {
     final router = RelicRouter();

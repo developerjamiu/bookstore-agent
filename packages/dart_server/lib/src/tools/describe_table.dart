@@ -15,9 +15,7 @@ class DescribeTableTool {
   final Genkit _ai;
   final Database _db;
 
-  DescribeTableTool({required Genkit ai, required Database db})
-    : _ai = ai,
-      _db = db;
+  DescribeTableTool({required this._ai, required this._db});
 
   Tool<TableNameInput, String> call() {
     return _ai.defineTool(

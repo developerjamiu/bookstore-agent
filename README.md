@@ -163,7 +163,7 @@ extension. You'll see 9 tables with real data:
 ### 3. Run the tests (no API key needed)
 
 ```sh
-# Server: 46 tests using fake models and fake flows
+# Server: 61 tests using fake models and fake flows
 dart test packages/dart_server
 
 # Client — 14 tests using mock HTTP
@@ -263,8 +263,10 @@ answer must come from actual query results, not the model's training data.
 
 ### Two-phase generate pattern
 
-Gemini doesn't support `tools` + `outputSchema` in the same API call. The
-agent works around this with two separate calls:
+Sending `tools` and `outputSchema` in one Gemini call is only a preview
+feature. In a live test on 2026-11-13, a single call with both made the model
+loop on tool calls without ever answering. Two separate calls keep the
+research and the structured answer reliable:
 
 1. **Research phase** — tools enabled, `maxTurns: 10`, model explores freely
 2. **Synthesis phase** — `outputSchema` enabled, model produces structured

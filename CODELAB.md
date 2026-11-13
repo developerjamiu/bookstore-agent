@@ -10,14 +10,14 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 - Creating Genkit tools with `ai.defineTool()`
 - Building an agentic flow with a tool-calling loop and `maxTurns`
 - Splitting the work into two `generate` calls: one that uses tools, one that returns structured output
+- Making the agent admit when it can't answer, instead of inventing one
 - Wiring everything together with constructor dependency injection
 
-**Time:** ~30 minutes
+**Time:** 45 to 60 minutes
 
 **Prerequisites:**
 
-- [Dart SDK](https://dart.dev/get-dart) >= 3.12
-- A [Flutter SDK](https://docs.flutter.dev/get-started/install) that bundles Dart 3.12 or later
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) with Dart 3.12 or later (check with `flutter --version`)
 - A Google AI API key ([get one free](https://aistudio.google.com/apikey))
 
 ---

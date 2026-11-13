@@ -117,8 +117,7 @@ research_assistant/
 
 ## Prerequisites
 
-- **Dart SDK** >= 3.12 (`dart --version`)
-- **Flutter SDK** that bundles Dart 3.12 or later (`flutter --version`)
+- **Flutter SDK** with Dart 3.12 or later (`flutter --version`)
 - **Node.js** >= 20 — for `packages/nodejs_server` only
 - **Google AI API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (`GOOGLE_API_KEY` / `GEMINI_API_KEY`; never commit keys)
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer)

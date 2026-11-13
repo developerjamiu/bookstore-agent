@@ -9,7 +9,7 @@ import '../schemas/table_name_input.dart';
 import '../utils/message_helpers.dart';
 
 class ResearchAgent {
-  static const _researchPrompt =
+  static const _prompt =
       'You are a database analyst agent. You can ONLY answer questions '
       'by querying the music store database. Never use your own knowledge. '
       'You do NOT know the database schema, so you must discover it using '
@@ -23,6 +23,13 @@ class ResearchAgent {
       '3. Write and run SQL queries to find the answer.\n'
       '4. If a query returns unexpected results, try a different approach.\n'
       '5. If the question cannot be answered with the available data, say so.\n\n'
+      'When you are done, reply with:\n'
+      '- answer: a clear answer that interprets the query results. When '
+      'listing items such as tracks, name each distinct item once and give '
+      'a count when it appears more than once.\n'
+      '- sources: the SELECT statements that produced the key results.\n'
+      '- confidence: "high" if the query results clearly answer the '
+      'question, "medium" if partially, "low" if the data was not found.\n\n'
       'NEVER answer from your own knowledge. All answers must come from query results.';
 
   static const _maxTurns = 10;
@@ -30,18 +37,6 @@ class ResearchAgent {
   static const _outOfTurnsAnswer =
       "I couldn't finish researching this question within the allowed "
       'steps. Try asking something more specific.';
-
-  static const _synthesisPrompt =
-      'You are a database analyst. Using ONLY the research notes below, '
-      'produce a structured answer to the user\'s question.\n\n'
-      'Rules:\n'
-      '- Set confidence to "high" if the query results clearly answer the '
-      'question, "medium" if partially, "low" if the data was not found.\n'
-      '- In the sources array, include the SQL queries from the notes '
-      'that produced the key results (the SELECT statements).\n'
-      '- Write a clear, natural-language answer that interprets the data.\n'
-      '- When listing items such as tracks, name each distinct item once and '
-      'give a count when it appears more than once.';
 
   final Genkit _ai;
   final ModelRef<GeminiOptions> _model;
@@ -67,57 +62,28 @@ class ResearchAgent {
   }
 
   Future<ResearchResult> research(String question) async {
-    final research = await _runResearchPhase(question);
-    final toolCalls = extractToolCalls(research.messages);
+    // One call: the model uses the tools as often as it needs, up to
+    // _maxTurns times, then replies in the ResearchOutput shape.
+    final response = await _ai.generate(
+      model: _model,
+      system: _prompt,
+      prompt: question,
+      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
+      outputSchema: ResearchOutput.$schema,
+      maxTurns: _maxTurns,
+    );
+    _throwIfFailed(response);
+    final toolCalls = extractToolCalls(response.messages);
 
-    // No query ran, so nothing came from the database: answer with low
-    // confidence. That covers out-of-scope questions and an agent that ran
-    // out of turns before querying.
-    if (!toolCalls.any((call) => call.tool == 'runQuery')) {
+    // The model hit the turn limit before it wrote an answer.
+    if (response.finishReason == FinishReason.aborted) {
       return ResearchResult(
-        answer: research.text.isNotEmpty ? research.text : _outOfTurnsAnswer,
+        answer: _outOfTurnsAnswer,
         sources: const [],
         confidence: 'low',
         toolCalls: toolCalls,
       );
     }
-
-    final notes = buildResearchNotes(research);
-    final synthesis = await _runSynthesisPhase(question, notes);
-    return ResearchResult(
-      answer: synthesis.answer,
-      sources: synthesis.sources,
-      confidence: synthesis.confidence,
-      toolCalls: toolCalls,
-    );
-  }
-
-  /// Phase 1: the model calls tools until it can answer, up to
-  /// [_maxTurns] times. Hitting the limit doesn't throw. Genkit returns
-  /// everything that happened so far.
-  Future<GenerateResult> _runResearchPhase(String question) async {
-    final response = await _ai.generate(
-      model: _model,
-      system: _researchPrompt,
-      prompt: question,
-      tools: [_listTablesTool, _describeTableTool, _runQueryTool],
-      maxTurns: _maxTurns,
-    );
-    _throwIfFailed(response);
-    return response;
-  }
-
-  Future<ResearchOutput> _runSynthesisPhase(
-    String question,
-    String notes,
-  ) async {
-    final response = await _ai.generate(
-      model: _model,
-      system: _synthesisPrompt,
-      prompt: 'Question: $question\n\nResearch notes:\n$notes',
-      outputSchema: ResearchOutput.$schema,
-    );
-    _throwIfFailed(response);
 
     // A reply that does not match the schema comes back as an error on the
     // result instead of a throw. Fail here so the route answers 500.
@@ -128,7 +94,15 @@ class ResearchAgent {
         cause: response.cause,
       );
     }
-    return output;
+
+    // No query ran, so nothing in the answer came from the database.
+    final ranQuery = toolCalls.any((call) => call.tool == 'runQuery');
+    return ResearchResult(
+      answer: output.answer,
+      sources: ranQuery ? output.sources : const [],
+      confidence: ranQuery ? output.confidence : 'low',
+      toolCalls: toolCalls,
+    );
   }
 
   /// Throws if the model call failed.

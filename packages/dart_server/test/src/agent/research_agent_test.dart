@@ -32,12 +32,7 @@ void main() {
 
     ai.defineModel(
       name: 'fake/model',
-      fn: (request, _) async {
-        if (request.output != null) {
-          return _structuredResponse(request);
-        }
-        return _toolCallingResponse(request);
-      },
+      fn: (request, _) async => _toolCallingResponse(request),
     );
 
     final listTablesTool = ai.defineTool(
@@ -100,14 +95,13 @@ void main() {
       expect(toolNames, contains('runQuery'));
     });
 
-    test('does not call a finished research phase cut short', () async {
-      final synthesisRequests = <ModelRequest>[];
+    test('sends the tools and the answer schema in one call', () async {
+      final requests = <ModelRequest>[];
       ai.defineModel(
         name: 'fake/recording',
         fn: (request, _) async {
-          if (request.output == null) return _toolCallingResponse(request);
-          synthesisRequests.add(request);
-          return _structuredResponse(request);
+          requests.add(request);
+          return _toolCallingResponse(request);
         },
       );
 
@@ -115,11 +109,11 @@ void main() {
         'fake/recording',
       ).research('What artists are in the database?');
 
-      final prompt = synthesisRequests.single.messages
-          .map((m) => m.text)
-          .join('\n');
-      expect(prompt, contains('AC/DC'));
-      expect(prompt, isNot(contains('cut short')));
+      expect(requests, hasLength(4));
+      for (final request in requests) {
+        expect(request.tools, isNotEmpty);
+        expect(request.output, isNotNull);
+      }
     });
 
     test('includes SQL queries in sources', () async {
@@ -135,18 +129,16 @@ void main() {
       expect(result.confidence, 'low');
     });
 
-    test('answers from the research reply with low confidence when no query '
+    test('answers with low confidence and no sources when no query '
         'ran', () async {
       ai.defineModel(
         name: 'fake/refuses',
         fn: (request, _) async => _textResponse(
-          request.output != null
-              ? jsonEncode({
-                  'answer': 'I have no weather data.',
-                  'sources': ['SELECT 1'],
-                  'confidence': 'high',
-                })
-              : 'The database has no weather data.',
+          jsonEncode({
+            'answer': 'I have no weather data.',
+            'sources': ['SELECT 1'],
+            'confidence': 'high',
+          }),
         ),
       );
 
@@ -154,28 +146,26 @@ void main() {
         'fake/refuses',
       ).research('What is the weather in Paris?');
 
-      expect(result.answer, 'The database has no weather data.');
+      expect(result.answer, 'I have no weather data.');
       expect(result.confidence, 'low');
       expect(result.sources, isEmpty);
     });
   });
 
   group('ResearchAgent out of turns', () {
+    const outOfTurnsAnswer =
+        "I couldn't finish researching this question within the allowed "
+        'steps. Try asking something more specific.';
+
     /// Defines a model named [name] that never stops calling tools: every
-    /// research turn requests [nextTool]. Synthesis requests go to
-    /// [synthesisRequests] and get a structured answer.
+    /// turn requests [nextTool], so it never writes an answer.
     void defineEndlessModel(
       String name,
       ToolRequest Function(int turn) nextTool,
-      List<ModelRequest> synthesisRequests,
     ) {
       ai.defineModel(
         name: name,
         fn: (request, _) async {
-          if (request.output != null) {
-            synthesisRequests.add(request);
-            return _structuredResponse(request);
-          }
           final turn = request.messages.where((m) => m.role == Role.tool);
           return ModelResponse(
             finishReason: FinishReason.stop,
@@ -188,58 +178,41 @@ void main() {
       );
     }
 
-    test('synthesizes from the query results it already has', () async {
-      final synthesisRequests = <ModelRequest>[];
-      defineEndlessModel(
-        'fake/endless-queries',
-        (turn) => ToolRequest(
-          ref: 'q$turn',
-          name: 'runQuery',
-          input: {'sql': 'SELECT Name FROM artists LIMIT $turn'},
-        ),
-        synthesisRequests,
-      );
+    test(
+      'says it could not finish, with low confidence, after queries',
+      () async {
+        defineEndlessModel(
+          'fake/endless-queries',
+          (turn) => ToolRequest(
+            ref: 'q$turn',
+            name: 'runQuery',
+            input: {'sql': 'SELECT Name FROM artists LIMIT $turn'},
+          ),
+        );
 
-      final result = await agentFor(
-        'fake/endless-queries',
-      ).research('What artists are in the database?');
+        final result = await agentFor(
+          'fake/endless-queries',
+        ).research('What artists are in the database?');
 
-      expect(synthesisRequests, hasLength(1));
-      final notes = synthesisRequests.single.messages
-          .where((m) => m.role == Role.user)
-          .map((m) => m.text)
-          .join('\n');
-      expect(notes, contains('[Query: SELECT Name FROM artists LIMIT 0]'));
-      expect(notes, contains('Led Zeppelin'));
-      expect(
-        notes,
-        isNot(contains('No query results were produced during research.')),
-      );
-      expect(result.toolCalls, hasLength(10));
-      expect(result.toolCalls.map((c) => c.tool).toSet(), {'runQuery'});
-      expect(result.confidence, 'high');
-    });
+        expect(result.answer, outOfTurnsAnswer);
+        expect(result.confidence, 'low');
+        expect(result.sources, isEmpty);
+        expect(result.toolCalls, hasLength(10));
+        expect(result.toolCalls.map((c) => c.tool).toSet(), {'runQuery'});
+      },
+    );
 
-    test('answers with low confidence and skips synthesis when no query '
-        'ran', () async {
-      final synthesisRequests = <ModelRequest>[];
+    test('says it could not finish when no query ran', () async {
       defineEndlessModel(
         'fake/endless-exploring',
         (turn) => ToolRequest(ref: 't$turn', name: 'listTables', input: {}),
-        synthesisRequests,
       );
 
       final result = await agentFor(
         'fake/endless-exploring',
       ).research('What artists are in the database?');
 
-      expect(synthesisRequests, isEmpty);
-      expect(
-        result.answer,
-        "I couldn't finish researching this question within the allowed "
-        'steps. Try asking something more specific.',
-      );
-      expect(result.sources, isEmpty);
+      expect(result.answer, outOfTurnsAnswer);
       expect(result.confidence, 'low');
       expect(result.toolCalls, hasLength(10));
       expect(result.toolCalls.first.tool, 'listTables');
@@ -285,30 +258,6 @@ void main() {
       },
     );
 
-    test('throws when only the research phase fails', () async {
-      // Synthesis would succeed, so only the research-phase check can turn
-      // this failure into an error instead of an answer.
-      ai.defineModel(
-        name: 'fake/research-quota',
-        fn: (request, _) async {
-          if (request.output != null) return _structuredResponse(request);
-          throw GenkitException(
-            'Quota exceeded for this model.',
-            status: StatusCode.resourceExhausted,
-          );
-        },
-      );
-
-      await expectLater(
-        agentFor('fake/research-quota').research('How many artists?'),
-        throwsA(
-          isA<GenkitException>()
-              .having((e) => e.status, 'status', StatusCode.resourceExhausted)
-              .having((e) => e.message, 'message', contains('Quota exceeded')),
-        ),
-      );
-    });
-
     test('throws when a tool fails during research', () async {
       final failingRunQuery = ai.defineTool(
         name: 'failingRunQuery',
@@ -320,7 +269,6 @@ void main() {
       ai.defineModel(
         name: 'fake/query-first',
         fn: (request, _) async {
-          if (request.output != null) return _structuredResponse(request);
           return ModelResponse(
             finishReason: FinishReason.stop,
             message: Message(
@@ -355,12 +303,11 @@ void main() {
       );
     });
 
-    test('throws when the synthesis reply is not JSON', () async {
+    test('throws when the final reply is not JSON', () async {
       ai.defineModel(
         name: 'fake/prose',
-        fn: (request, _) async => request.output != null
-            ? _textResponse('Sorry, no JSON today.')
-            : _toolCallingResponse(request),
+        fn: (request, _) async =>
+            _researchThen(request, 'Sorry, no JSON today.'),
       );
 
       await expectLater(
@@ -375,12 +322,10 @@ void main() {
       );
     });
 
-    test('throws when the synthesis reply does not match the schema', () async {
+    test('throws when the final reply does not match the schema', () async {
       ai.defineModel(
         name: 'fake/wrong-shape',
-        fn: (request, _) async => request.output != null
-            ? _textResponse('{"answer": 42}')
-            : _toolCallingResponse(request),
+        fn: (request, _) async => _researchThen(request, '{"answer": 42}'),
       );
 
       // The JSON parses, so Genkit returns it as output, and the mistyped
@@ -407,15 +352,7 @@ ModelResponse _toolCallingResponse(ModelRequest request) {
       .where((m) => m.role == Role.tool)
       .length;
 
-  if (_isUnanswerable(question)) {
-    return ModelResponse(
-      finishReason: FinishReason.stop,
-      message: Message(
-        role: Role.model,
-        content: [TextPart(text: 'I could not find relevant data.')],
-      ),
-    );
-  }
+  if (_isUnanswerable(question)) return _structuredResponse(request);
 
   if (toolResponseCount == 0) {
     return ModelResponse(
@@ -465,17 +402,17 @@ ModelResponse _toolCallingResponse(ModelRequest request) {
     );
   }
 
-  return ModelResponse(
-    finishReason: FinishReason.stop,
-    message: Message(
-      role: Role.model,
-      content: [
-        TextPart(
-          text: 'The database contains artists: AC/DC, Led Zeppelin, Queen.',
-        ),
-      ],
-    ),
-  );
+  return _structuredResponse(request);
+}
+
+/// Runs the default tool loop, then replies with [finalText] instead of
+/// a valid answer.
+ModelResponse _researchThen(ModelRequest request, String finalText) {
+  final toolResponseCount = request.messages
+      .where((m) => m.role == Role.tool)
+      .length;
+  if (toolResponseCount < 3) return _toolCallingResponse(request);
+  return _textResponse(finalText);
 }
 
 ModelResponse _structuredResponse(ModelRequest request) {

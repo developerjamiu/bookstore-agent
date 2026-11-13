@@ -20,9 +20,7 @@ Future<void> main() async {
   final researchFlow = AISetup(ai: ai, db: sqlite3.open(dbPath))();
   final routes = ResearchRoutes(researchFlow: researchFlow);
 
-  // Middleware only runs for requests that match a route, so the router is
-  // mounted for every method and path. That way cors() also answers
-  // preflights and adds its headers to 404 and 405 responses.
+  // Mounted for every path so cors() also reaches preflights and 404/405s.
   final app = RelicApp()
     ..use('/', cors())
     ..use('/', logRequests())

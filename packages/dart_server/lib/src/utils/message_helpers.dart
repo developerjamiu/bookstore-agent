@@ -4,7 +4,7 @@ import 'package:genkit/genkit.dart';
 
 import '../schemas/tool_call.dart';
 
-/// Extracts all tool requests from a conversation as [ToolCall] records.
+/// Lists every tool the model asked for, in order, for the app's trace.
 ///
 /// ```
 /// [ToolCall(tool: "listTables", input: "{}"),
@@ -31,10 +31,10 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
   return calls;
 }
 
-/// Builds synthesis-ready notes from a completed research response.
+/// Builds the notes Phase 2 turns into an answer.
 ///
-/// Includes only `runQuery` results (not schema exploration output)
-/// paired with the SQL that produced them, plus the agent's summary.
+/// Keeps only `runQuery` results, each under the SQL that produced it,
+/// then adds the model's own summary.
 ///
 /// ```
 /// [Query: SELECT Name FROM artists LIMIT 3]

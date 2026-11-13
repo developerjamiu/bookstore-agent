@@ -2,11 +2,10 @@ import 'package:relic/relic.dart';
 
 import '../utils/request_helpers.dart';
 
-class ResearchRoutes {
-  RelicRouter get router {
-    final router = RelicRouter();
+class ResearchRoutes implements RouterInjectable {
+  @override
+  void injectIn(RelicRouter router) {
     router.post('/api/research', _research);
-    return router;
   }
 
   Future<Response> _research(Request request) async {

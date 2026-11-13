@@ -35,7 +35,7 @@ dart pub get
 
 The starter project includes a **complete Flutter app** and a **Dart server skeleton**. The server currently returns placeholder data — your job is to build the AI agent that powers it.
 
-The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP server framework. Some of it is pre-built scaffolding you won't change: `packages/dart_server/lib/src/app.dart` defines `buildApp`, which puts CORS and request logging in front of your routes, and `packages/dart_server/lib/src/utils/request_helpers.dart` parses JSON bodies and builds JSON responses.
+The server uses [Relic](https://docs.dartrelic.dev/), a Dart HTTP server framework. `packages/dart_server/lib/src/utils/request_helpers.dart` is pre-built scaffolding you won't change: it parses JSON bodies and builds JSON responses.
 
 **Browse the database:**
 
@@ -111,8 +111,6 @@ Here's what you'll build to make this work:
 User question
     |
 bin/server.dart (opens DB, creates Genkit, starts Relic)
-    |
-app.dart (pre-built: CORS + request logging)
     |
 routes/research.dart (receives POST, calls the agent flow)
     |
@@ -810,16 +808,15 @@ import '../utils/request_helpers.dart';
 
 typedef ResearchFlow = Flow<String, ResearchResult, Never, Never>;
 
-class ResearchRoutes {
+class ResearchRoutes implements RouterInjectable {
   final ResearchFlow _researchFlow;
 
   ResearchRoutes({required ResearchFlow researchFlow})
     : _researchFlow = researchFlow;
 
-  RelicRouter get router {
-    final router = RelicRouter();
+  @override
+  void injectIn(RelicRouter router) {
     router.post('/api/research', _research);
-    return router;
   }
 
   Future<Response> _research(Request request) async {
@@ -844,7 +841,7 @@ class ResearchRoutes {
 }
 ```
 
-The `RelicRouter` and the request validation stay as they were in the placeholder. A `RelicRouter` maps a method and a path to a handler: `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, for example a 429 when your API quota runs out.
+The request validation stays as it was in the placeholder. `ResearchRoutes` implements Relic's `RouterInjectable`: its `injectIn` method registers the route, and `router.post('/api/research', _research)` sends every POST request for `/api/research` to `_research`. What's new is the injected `ResearchFlow`: the route calls it with the question and returns its result as JSON. Genkit errors become clear HTTP errors through `handleGenkitError`, for example a 429 when your API quota runs out.
 
 Until you update the entrypoint in Step 7, `dart analyze` reports a missing `researchFlow` argument in `bin/server.dart`. That is expected.
 
@@ -863,7 +860,6 @@ import 'package:relic/relic.dart';
 import 'package:sqlite3/sqlite3.dart';
 
 import 'package:dart_server/src/agent/setup.dart';
-import 'package:dart_server/src/app.dart';
 import 'package:dart_server/src/routes/research.dart';
 
 Future<void> main() async {
@@ -875,18 +871,18 @@ Future<void> main() async {
 
   final ai = Genkit(plugins: [googleAI()]);
   final researchFlow = AISetup(ai: ai, db: sqlite3.open(dbPath))();
-  final routes = ResearchRoutes(researchFlow: researchFlow);
+  final app = RelicApp()
+    ..use('/', logRequests())
+    ..inject(ResearchRoutes(researchFlow: researchFlow));
 
   final port = int.parse(Platform.environment['PORT'] ?? '8080');
-  final server = await buildApp(
-    routes.router,
-  ).serve(address: InternetAddress.anyIPv4, port: port);
+  final server = await app.serve(address: InternetAddress.anyIPv4, port: port);
 
   print('Server running on http://localhost:${server.port}');
 }
 ```
 
-Reading `PORT`, `buildApp` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `buildApp` comes from the pre-built `packages/dart_server/lib/src/app.dart`: it mounts your router behind the CORS and request-logging middleware, so every response gets CORS headers, including the 404 and 405 answers for unknown paths and methods. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
+The `RelicApp` setup, reading `PORT` and `app.serve` are the same as in the starter entrypoint. The new parts open the database, create Genkit with the Google AI plugin, and build the research flow you wired in Step 5. `RelicApp` is the server's router: `use('/', logRequests())` logs each request that reaches a route, and `inject` lets `ResearchRoutes` register its route through `injectIn`. `app.serve` starts the HTTP server on `port`. Relic listens only on localhost unless you pass an address, so `address: InternetAddress.anyIPv4` makes the server reachable from other machines on your network as well.
 
 **Test it live** from the repository root. If your shell is still in `packages/dart_server` from Step 1, run `cd ../..` first.
 

@@ -52,7 +52,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 ## Repository Structure
 
 ```
-music-store-agent/
+bookstore-agent/
 ├── pubspec.yaml                         # Dart workspace root
 ├── README.md
 │
@@ -138,8 +138,8 @@ music-store-agent/
 ### 1. Clone and install dependencies
 
 ```sh
-git clone https://github.com/developerjamiu/music-store-agent.git
-cd music-store-agent
+git clone https://github.com/developerjamiu/bookstore-agent.git
+cd bookstore-agent
 flutter pub get
 ```
 

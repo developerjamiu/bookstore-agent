@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:genkit/genkit.dart';
 
 import '../schemas/tool_call.dart';
+import '../tools/run_query.dart';
 
 /// Extracts all tool requests from a conversation as [ToolCall] records.
 ///
@@ -32,15 +33,17 @@ List<ToolCall> extractToolCalls(List<Message> messages) {
   return calls;
 }
 
-/// Whether any `runQuery` call in [messages] returned output.
+/// Whether any `runQuery` call in [messages] returned a query result.
+///
+/// A query that failed (a SQL error or a rejected statement) does not count.
+/// See [RunQueryTool.isResult].
 bool hasQueryResults(List<Message> messages) {
   for (final message in messages) {
     if (message.role != Role.tool) continue;
     for (final part in message.content) {
       final toolResponse = part.toolResponsePart?.toolResponse;
-      if (toolResponse?.name == 'runQuery' && toolResponse?.output != null) {
-        return true;
-      }
+      if (toolResponse == null || toolResponse.name != 'runQuery') continue;
+      if (RunQueryTool.isResult(toolResponse.output)) return true;
     }
   }
   return false;

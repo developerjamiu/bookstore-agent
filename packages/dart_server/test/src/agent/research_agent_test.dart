@@ -11,6 +11,9 @@ void main() {
   late Genkit ai;
   late ResearchAgent agent;
 
+  /// What the fake runQuery tool answers. Rows unless a test changes it.
+  late String runQueryOutput;
+
   /// Builds an agent that talks to the fake model named [model], with
   /// [runQueryTool] in place of the fake runQuery tool when given.
   late ResearchAgent Function(
@@ -21,6 +24,11 @@ void main() {
 
   setUp(() {
     ai = Genkit();
+    runQueryOutput = jsonEncode([
+      {'Name': 'AC/DC'},
+      {'Name': 'Led Zeppelin'},
+      {'Name': 'Queen'},
+    ]);
 
     ai.defineModel(
       name: 'fake/model',
@@ -59,13 +67,7 @@ void main() {
       description: 'Run a SQL query.',
       inputSchema: SqlQueryInput.$schema,
       outputSchema: SchemanticType.string(),
-      fn: (input, _) async => .response(
-        jsonEncode([
-          {'Name': 'AC/DC'},
-          {'Name': 'Led Zeppelin'},
-          {'Name': 'Queen'},
-        ]),
-      ),
+      fn: (input, _) async => .response(runQueryOutput),
     );
 
     agentFor = (model, {Tool<SqlQueryInput, String>? runQueryTool}) =>
@@ -195,6 +197,30 @@ void main() {
       expect(result.confidence, 'low');
       expect(result.toolCalls, hasLength(10));
       expect(result.toolCalls.first.tool, 'listTables');
+    });
+
+    test('answers with low confidence and skips synthesis when every query '
+        'failed', () async {
+      runQueryOutput = 'SQL error: no such table: weather';
+      final synthesisRequests = <ModelRequest>[];
+      defineEndlessModel(
+        'fake/endless-failing-queries',
+        (turn) => ToolRequest(
+          ref: 'q$turn',
+          name: 'runQuery',
+          input: {'sql': 'SELECT * FROM weather LIMIT $turn'},
+        ),
+        synthesisRequests,
+      );
+
+      final result = await agentFor(
+        'fake/endless-failing-queries',
+      ).research('What is the weather in Paris?');
+
+      expect(synthesisRequests, isEmpty);
+      expect(result.answer, startsWith("I couldn't finish researching"));
+      expect(result.confidence, 'low');
+      expect(result.toolCalls, hasLength(10));
     });
   });
 

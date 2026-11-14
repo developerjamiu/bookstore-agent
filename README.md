@@ -106,7 +106,7 @@ bookstore-agent/
 │   │           ├── middleware/          # CORS middleware tests
 │   │           └── helpers/             # In-memory test database, in-process server
 │   │
-│   └── client/                          # Flutter app
+│   └── flutter_app/                     # Flutter app
 │       ├── lib/src/
 │       │   ├── app.dart
 │       │   ├── screens/research_screen.dart
@@ -167,7 +167,7 @@ extension. You'll see 9 tables with real data:
 dart test packages/dart_server
 
 # Client — 14 tests using mock HTTP
-cd packages/client && flutter test
+cd packages/flutter_app && flutter test
 ```
 
 All tests pass without any Gemini API calls. The server tests use
@@ -237,7 +237,7 @@ curl -s http://localhost:8080/api/research \
 With the server running, start an iOS Simulator or Android emulator, then:
 
 ```sh
-cd packages/client
+cd packages/flutter_app
 flutter run
 ```
 

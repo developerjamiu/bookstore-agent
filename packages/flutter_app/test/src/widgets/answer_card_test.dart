@@ -1,5 +1,5 @@
-import 'package:client/src/services/research_api.dart';
-import 'package:client/src/widgets/answer_card.dart';
+import 'package:flutter_app/src/services/research_api.dart';
+import 'package:flutter_app/src/widgets/answer_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

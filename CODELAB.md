@@ -34,7 +34,10 @@ git checkout starter
 flutter pub get
 ```
 
-Open the `bookstore-agent` folder in your editor. In VS Code, use File > Open Folder, or run `code .` from the same terminal. You'll create every file in this codelab inside this folder, and the terminal commands run from it unless a step says otherwise.
+Open the `bookstore-agent` folder in your editor. In VS Code, either:
+
+- use **File > Open Folder**, or
+- run `code .` from the same terminal.
 
 ### Explore what you have
 

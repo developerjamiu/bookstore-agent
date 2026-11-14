@@ -48,7 +48,9 @@ class _ResearchScreenState extends State<ResearchScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = e is ResearchApiException
+            ? e.message
+            : 'Something went wrong. Please try again.';
         _loading = false;
       });
     }

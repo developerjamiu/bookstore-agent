@@ -99,6 +99,13 @@ void main() {
       expect(find.text('runQuery'), findsOneWidget);
 
       // -- Reset --
+      // The expanded trace can push the button below the screen, so scroll
+      // to it the way a user would.
+      await tester.scrollUntilVisible(
+        find.text('New question'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('New question'));
       await tester.pumpAndSettle();
 

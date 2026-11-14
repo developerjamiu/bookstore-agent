@@ -13,14 +13,14 @@ export function errorResponse(res: ServerResponse, statusCode: number, message: 
 /** Used once you wire Genkit in the research route (see CODELAB-NODEJS.md). */
 export function handleGenkitError(res: ServerResponse, e: GenkitError): void {
   console.error('Genkit error:', e);
-  const message = (e.message ?? '').toLowerCase();
-  if (message.includes('quota') || message.includes('resource_exhausted')) {
-    errorResponse(res, 429, 'API quota exceeded. Please try again later.');
-    return;
+  switch (e.status) {
+    case 'RESOURCE_EXHAUSTED':
+      errorResponse(res, 429, 'API quota exceeded. Please try again later.');
+      return;
+    case 'UNAVAILABLE':
+      errorResponse(res, 503, 'Model is temporarily unavailable. Please retry.');
+      return;
+    default:
+      errorResponse(res, 500, 'Agent failed. Check server logs for details.');
   }
-  if (message.includes('high demand')) {
-    errorResponse(res, 503, 'Model is temporarily unavailable. Please retry.');
-    return;
-  }
-  errorResponse(res, 500, 'Agent failed. Check server logs for details.');
 }

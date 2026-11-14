@@ -41,13 +41,13 @@ Every tool call is a **decision the model made** — visible in the UI's
 | ------------ | ----------------------------------------------------------- |
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) |
 | LLM          | Google Gemini (via `genkit_google_genai`)                   |
-| Server       | [Relic](https://docs.dartrelic.dev/) (Dart) or Node.js HTTP server (`packages/dart_server` · `packages/nodejs_server`) |
+| Server       | [Relic](https://docs.dartrelic.dev/) (Dart) or Node.js HTTP server (`packages/dart_server` · `other_languages/nodejs_server`) |
 | Database     | SQLite (in-process, no server needed)                       |
 | Schemas      | Schemantic (code-generated JSON schemas)                    |
 | Client       | Flutter (Material 3)                                        |
 | Testing      | Fake models via `ai.defineModel()` — no mocking libraries   |
 
-**Node.js backend (optional):** same HTTP API for the Flutter client. Use [Genkit for JavaScript](https://genkit.dev/docs/js/get-started/) with `@genkit-ai/google-genai`, **Zod** schemas via `genkit`, **`better-sqlite3`**, and TypeScript in `packages/nodejs_server/`.
+**Node.js backend (optional):** same HTTP API for the Flutter client. Use [Genkit for JavaScript](https://genkit.dev/docs/js/get-started/) with `@genkit-ai/google-genai`, **Zod** schemas via `genkit`, **`better-sqlite3`**, and TypeScript in `other_languages/nodejs_server/`.
 
 ## Repository Structure
 
@@ -57,29 +57,6 @@ bookstore-agent/
 ├── README.md
 │
 ├── packages/
-│   ├── nodejs_server/                   # Node + Genkit (TypeScript) — same /api/research API
-│   │   ├── package.json
-│   │   ├── package-lock.json
-│   │   ├── tsconfig.json
-│   │   └── src/
-│   │       ├── index.ts                 # HTTP server; opens SQLite; wires research flow
-│   │       ├── middleware/
-│   │       │   └── cors.ts              # CORS headers + OPTIONS preflight
-│   │       ├── routes/
-│   │       │   └── research.ts          # POST /api/research; validates JSON; calls agent flow
-│   │       ├── schemas/
-│   │       │   └── researchResult.ts    # Zod: ResearchResult, tool calls, model output
-│   │       ├── tools/
-│   │       │   ├── listTables.ts        # Tool: list SQLite tables
-│   │       │   ├── describeTable.ts     # Tool: PRAGMA schema / FKs for one table
-│   │       │   └── runQuery.ts          # Tool: read-only SELECT (row cap)
-│   │       ├── utils/
-│   │       │   ├── requestHelpers.ts    # JSON responses + Genkit error mapping
-│   │       │   └── messageHelpers.ts     # List the tools the agent called
-│   │       └── agent/
-│   │           ├── researchAgent.ts      # Agent: tool loop + JSON answer
-│   │           └── setup.ts             # Composition root: Genkit + tools + flow
-│   │
 │   ├── dart_server/
 │   │   ├── bin/server.dart              # Relic server entrypoint
 │   │   ├── data/bookstore.db            # Pre-seeded SQLite database
@@ -116,6 +93,31 @@ bookstore-agent/
 │       │   └── services/research_api.dart
 │       ├── test/                        # Unit + widget tests
 │       └── integration_test/            # Full-flow integration test
+│
+└── other_languages/                     # The same server in other languages
+    ├── README.md                        # What a port must provide
+    └── nodejs_server/                   # Node + Genkit (TypeScript) — same /api/research API
+        ├── package.json
+        ├── package-lock.json
+        ├── tsconfig.json
+        └── src/
+            ├── index.ts                 # HTTP server; opens SQLite; wires research flow
+            ├── middleware/
+            │   └── cors.ts              # CORS headers + OPTIONS preflight
+            ├── routes/
+            │   └── research.ts          # POST /api/research; validates JSON; calls agent flow
+            ├── schemas/
+            │   └── researchResult.ts    # Zod: ResearchResult, tool calls, model output
+            ├── tools/
+            │   ├── listTables.ts        # Tool: list SQLite tables
+            │   ├── describeTable.ts     # Tool: PRAGMA schema / FKs for one table
+            │   └── runQuery.ts          # Tool: read-only SELECT (row cap)
+            ├── utils/
+            │   ├── requestHelpers.ts    # JSON responses + Genkit error mapping
+            │   └── messageHelpers.ts     # List the tools the agent called
+            └── agent/
+                ├── researchAgent.ts      # Agent: tool loop + JSON answer
+                └── setup.ts             # Composition root: Genkit + tools + flow
 ```
 
 ## Branch Structure
@@ -130,7 +132,7 @@ bookstore-agent/
 - **Flutter SDK** with Dart 3.12 or later (`flutter --version`)
 - **iOS Simulator or Android emulator** (Xcode or Android Studio), to run the Flutter app
 - **Google AI API key** — get one free at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (set `GOOGLE_API_KEY` for Dart; `GEMINI_API_KEY` or `GOOGLE_API_KEY` for Node — never commit keys)
-- **Node.js** >= 20 (`node --version`) — only if you run `packages/nodejs_server`
+- **Node.js** >= 20 (`node --version`) — only if you run `other_languages/nodejs_server`
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer) to browse the database visually
 
 ## Getting Started
@@ -200,7 +202,7 @@ calls 8080, so use another port only for curl testing.
 Use **either** the Dart server **or** the Node server on port **8080** — not both at once. The Node app reads the same database file: `packages/dart_server/data/bookstore.db`.
 
 ```sh
-cd packages/nodejs_server
+cd other_languages/nodejs_server
 npm install
 export GEMINI_API_KEY=your-key-here
 npm start
@@ -279,7 +281,7 @@ it couldn't finish.
   loading states, error handling, and "New question" reset
 - **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, CORS,
   `request_helpers.dart`, route returning placeholder data
-- **Node server scaffolding** (on starter forks) — `packages/nodejs_server` shell with
+- **Node server scaffolding** (on starter forks) — `other_languages/nodejs_server` shell with
   placeholder `POST /api/research`; on **`main`** here, the full Node agent matches the Dart reference
 - **SQLite database** — `packages/dart_server/data/bookstore.db` pre-seeded with all 9 tables (shared path for Dart and Node on `main`)
 - **Pubspec files** — all dependencies already configured
@@ -298,7 +300,7 @@ it couldn't finish.
 | **Agent tests** — `research_agent_test.dart`                                                                                    | Test the agent using `ai.defineModel()` with fake responses                   |
 | **Tool tests** — `list_tables_test.dart`, `describe_table_test.dart`, `run_query_test.dart`                                     | Test each tool's logic method against a real in-memory database               |
 
-**Node track (`packages/nodejs_server/`):** add Zod schemas, tools, `messageHelpers`, `ResearchAgent`, `setup`, then wire `research.ts` and `index.ts` (same API as Dart for Flutter).
+**Node track (`other_languages/nodejs_server/`):** add Zod schemas, tools, `messageHelpers`, `ResearchAgent`, `setup`, then wire `research.ts` and `index.ts` (same API as Dart for Flutter).
 
 ### The codelab experience
 

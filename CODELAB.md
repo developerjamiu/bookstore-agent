@@ -23,6 +23,8 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 - An iOS Simulator (Xcode) or Android emulator (Android Studio) to run the Flutter app
 - A code editor, such as [VS Code](https://code.visualstudio.com/) with the Dart and Flutter extensions
 
+> **New to calling Gemini?** Try the [AI Travel Planner](https://github.com/developerjamiu/travel_planner) codelab first. It's a Flutter app that makes a single Gemini call, with no tools and no agent loop, so it's a gentler start.
+
 ---
 
 ## Step 0: Get the Starter Project

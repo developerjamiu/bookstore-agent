@@ -1,6 +1,6 @@
 # Bookstore Agent — Build Your First AI Agent with Genkit
 
-> **This `starter` branch** (typical **fork** clone) is the **codelab starting point**: Flutter + Dart server skeleton + **Node.js skeleton** under `packages/nodejs_server/` with placeholder APIs.  
+> **This `starter` branch** (typical **fork** clone) is the **codelab starting point**: Flutter + Dart server skeleton + **Node.js skeleton** under `other_languages/nodejs_server/` with placeholder APIs.  
 > **Full solution** (completed Dart + Node agents, server tests): [`developerjamiu/bookstore-agent`](https://github.com/developerjamiu/bookstore-agent) branch **`main`**.
 
 A hands-on codelab project where you build a **real AI agent** — an LLM that
@@ -44,7 +44,7 @@ Every tool call is a **decision the model made** — visible in the UI's
 | ------------ | ----------------------------------------------------------- |
 | AI Framework | [Genkit for Dart](https://github.com/genkit-ai/genkit-dart) **or** [Genkit JS](https://genkit.dev/docs/js/get-started/) (Node track) |
 | LLM          | Google Gemini — set `GOOGLE_API_KEY` or `GEMINI_API_KEY`    |
-| Server       | **Dart:** [Relic](https://docs.dartrelic.dev/) (`packages/dart_server`) **·** **Node:** `packages/nodejs_server` |
+| Server       | **Dart:** [Relic](https://docs.dartrelic.dev/) (`packages/dart_server`) **·** **Node:** `other_languages/nodejs_server` |
 | Database     | SQLite file `packages/dart_server/data/bookstore.db` (Dart track & Node final wiring) |
 | Client       | Flutter (Material 3) — `POST /api/research` on port **8080** |
 
@@ -60,18 +60,6 @@ bookstore-agent/
 ├── CODELAB-NODEJS.md
 │
 ├── packages/
-│   ├── nodejs_server/
-│   │   ├── package.json
-│   │   ├── package-lock.json
-│   │   ├── tsconfig.json
-│   │   └── src/
-│   │       ├── index.ts                 # Listens on 8080; forwards POST /api/research
-│   │       ├── middleware/
-│   │       │   └── cors.ts              # CORS headers + OPTIONS preflight
-│   │       ├── routes/
-│   │       │   └── research.ts          # Validates JSON body; returns placeholder result
-│   │       └── utils/
-│   │           └── requestHelpers.ts    # jsonResponse, errorResponse, handleGenkitError (for later)
 │   ├── dart_server/
 │   │   ├── bin/server.dart              # Relic server entrypoint
 │   │   ├── data/bookstore.db            # Pre-seeded SQLite database
@@ -106,6 +94,21 @@ bookstore-agent/
 │       │   └── services/research_api.dart
 │       ├── test/                        # Unit + widget tests
 │       └── integration_test/            # Full-flow integration test
+│
+└── other_languages/                     # The same server in other languages
+    ├── README.md                        # What a port must provide
+    └── nodejs_server/
+        ├── package.json
+        ├── package-lock.json
+        ├── tsconfig.json
+        └── src/
+            ├── index.ts                 # Listens on 8080; forwards POST /api/research
+            ├── middleware/
+            │   └── cors.ts              # CORS headers + OPTIONS preflight
+            ├── routes/
+            │   └── research.ts          # Validates JSON body; returns placeholder result
+            └── utils/
+                └── requestHelpers.ts    # jsonResponse, errorResponse, handleGenkitError (for later)
 ```
 
 ## Branch Structure
@@ -119,7 +122,7 @@ bookstore-agent/
 
 - **Flutter SDK** with Dart 3.12 or later (`flutter --version`)
 - **iOS Simulator or Android emulator** (Xcode or Android Studio), to run the Flutter app
-- **Node.js** >= 20 — for `packages/nodejs_server` only
+- **Node.js** >= 20 — for `other_languages/nodejs_server` only
 - **Google AI API key** — [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (`GOOGLE_API_KEY` / `GEMINI_API_KEY`; never commit keys)
 - **SQLite Viewer** (optional) — [VS Code extension](https://marketplace.visualstudio.com/items?itemName=qwtel.sqlite-viewer)
 
@@ -170,7 +173,7 @@ dart run packages/dart_server/bin/server.dart
 **Node — placeholder response (no API key required for the shell):**
 
 ```sh
-cd packages/nodejs_server && npm install && npm start
+cd other_languages/nodejs_server && npm install && npm start
 ```
 
 The server listens on port 8080 because the Flutter client calls
@@ -265,7 +268,7 @@ it couldn't finish.
   loading states, error handling, and "New question" reset
 - **Dart server scaffolding** — `packages/dart_server`: `bin/server.dart`, CORS,
   `request_helpers.dart`, placeholder `POST /api/research`
-- **Node server scaffolding** — `packages/nodejs_server`: HTTP server, CORS,
+- **Node server scaffolding** — `other_languages/nodejs_server`: HTTP server, CORS,
   placeholder `POST /api/research` (see **Repository Structure**). No SQLite or Genkit flows yet.
 - **SQLite database** — `packages/dart_server/data/bookstore.db` pre-seeded with all 9 tables
 - **Pubspec files** — all dependencies already configured

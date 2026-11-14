@@ -1,6 +1,6 @@
 # Build Your First AI Agent with Genkit — Node.js Track
 
-This guide documents the **complete** Node implementation (same files as on [`developerjamiu/bookstore-agent`](https://github.com/developerjamiu/bookstore-agent) branch **`main`**). On **this `starter` fork**, you build those files from scratch on top of the placeholder shell in `packages/nodejs_server/`, or read along with the reference repo.
+This guide documents the **complete** Node implementation (same files as on [`developerjamiu/bookstore-agent`](https://github.com/developerjamiu/bookstore-agent) branch **`main`**). On **this `starter` fork**, you build those files from scratch on top of the placeholder shell in `other_languages/nodejs_server/`, or read along with the reference repo.
 
 **Prerequisites:** Node.js 20+, `GEMINI_API_KEY` or `GOOGLE_API_KEY` in the environment (never commit keys).
 
@@ -11,7 +11,7 @@ This guide documents the **complete** Node implementation (same files as on [`de
 ## Step 0: Install and run the reference server
 
 ```sh
-cd packages/nodejs_server
+cd other_languages/nodejs_server
 npm install
 export GEMINI_API_KEY=your-key-here
 npm start
@@ -23,7 +23,7 @@ The server reads SQLite from `packages/dart_server/data/bookstore.db`.
 
 ## Step 1–8: Implementation files (reference)
 
-The following files form the Node agent. On **`main`** they are already present under `packages/nodejs_server/src/`.
+The following files form the Node agent. On **`main`** they are already present under `other_languages/nodejs_server/src/`.
 
 ### Schemas — `src/schemas/researchResult.ts`
 
@@ -55,7 +55,6 @@ export const ResearchResultSchema = z.object({
 export type ResearchResult = z.infer<typeof ResearchResultSchema>;
 export type ResearchOutput = z.infer<typeof ResearchOutputSchema>;
 export type ToolCall = z.infer<typeof ToolCallSchema>;
-
 ```
 
 ### Tool: listTables — `src/tools/listTables.ts`
@@ -86,7 +85,6 @@ export function createListTablesTool(ai: Genkit, db: Database) {
     },
   );
 }
-
 ```
 
 ### Tool: describeTable — `src/tools/describeTable.ts`
@@ -151,7 +149,6 @@ export function createDescribeTableTool(ai: Genkit, db: Database) {
     },
   );
 }
-
 ```
 
 ### Tool: runQuery — `src/tools/runQuery.ts`
@@ -208,13 +205,12 @@ export function createRunQueryTool(ai: Genkit, db: Database) {
     },
   );
 }
-
 ```
 
 ### Message helpers — `src/utils/messageHelpers.ts`
 
 ```typescript
-import type { GenerateResponse, MessageData, Part } from 'genkit';
+import type { MessageData, Part } from 'genkit';
 
 import type { ToolCall } from '../schemas/researchResult.js';
 
@@ -231,19 +227,7 @@ function isToolRequestPart(
   );
 }
 
-function isToolResponsePart(
-  part: Part,
-): part is Part & {
-  toolResponse: { name: string; ref?: string; output?: unknown };
-} {
-  return (
-    typeof part === 'object' &&
-    part !== null &&
-    'toolResponse' in part &&
-    part.toolResponse !== undefined
-  );
-}
-
+/** Lists every tool the model asked for, in order, for the app's trace. */
 export function extractToolCalls(messages: MessageData[]): ToolCall[] {
   const calls: ToolCall[] = [];
   for (const message of messages) {
@@ -258,61 +242,12 @@ export function extractToolCalls(messages: MessageData[]): ToolCall[] {
   }
   return calls;
 }
-
-function findQueryForResponse(
-  messages: MessageData[],
-  toolResponse: { name: string; ref?: string },
-): string | null {
-  for (const message of messages) {
-    for (const part of message.content) {
-      if (!isToolRequestPart(part)) continue;
-      const req = part.toolRequest;
-      if (req.name !== 'runQuery') continue;
-      if (req.ref !== toolResponse.ref) continue;
-      const input = req.input as { sql?: string } | undefined;
-      return input?.sql ?? null;
-    }
-  }
-  return null;
-}
-
-export function buildResearchNotes(response: GenerateResponse): string {
-  const messages = response.messages;
-  const buffer: string[] = [];
-
-  for (const message of messages) {
-    if (message.role !== 'tool') continue;
-    for (const part of message.content) {
-      if (!isToolResponsePart(part)) continue;
-      const toolResponse = part.toolResponse;
-      if (toolResponse.name !== 'runQuery') continue;
-      const output = toolResponse.output;
-      if (output == null) continue;
-
-      const sql = findQueryForResponse(messages, toolResponse);
-      if (sql != null) buffer.push(`[Query: ${sql}]`);
-      buffer.push(typeof output === 'string' ? output : JSON.stringify(output));
-      buffer.push('');
-    }
-  }
-
-  const modelSummary = response.text;
-  if (modelSummary) {
-    buffer.push('[Agent summary]');
-    buffer.push(modelSummary);
-  }
-
-  const result = buffer.join('\n').trim();
-  if (!result) return 'No query results were produced during research.';
-  return result;
-}
-
 ```
 
 ### Research agent — `src/agent/researchAgent.ts`
 
 ```typescript
-import type { Genkit, ToolAction } from 'genkit';
+import type { Genkit, StatusName, ToolAction } from 'genkit';
 import { GenkitError, z } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
@@ -321,33 +256,34 @@ import {
   ResearchResultSchema,
   type ResearchResult,
 } from '../schemas/researchResult.js';
-import { buildResearchNotes, extractToolCalls } from '../utils/messageHelpers.js';
+import { extractToolCalls } from '../utils/messageHelpers.js';
 
-const RESEARCH_PROMPT =
-  'You are a database analyst agent. You can ONLY answer questions ' +
-  'by querying the bookstore database. Never use your own knowledge. ' +
-  'You do NOT know the database schema, so you must discover it using ' +
-  'the tools provided:\n' +
-  '- listTables: discover what tables exist\n' +
-  '- describeTable: see the columns and foreign keys of a table\n' +
-  '- runQuery: execute a read-only SQL SELECT query\n\n' +
-  'Strategy:\n' +
-  '1. ALWAYS start by calling listTables — every question, no exceptions.\n' +
-  '2. Call describeTable on relevant tables to understand columns and joins.\n' +
-  '3. Write and run SQL queries to find the answer.\n' +
+const PROMPT =
+  'You are a database analyst. Answer questions ONLY from the results of ' +
+  'queries you run on the bookstore database, never from your own ' +
+  'knowledge.\n\n' +
+  'You do not know the database schema. To answer:\n' +
+  '1. Use listTables to see what tables exist.\n' +
+  '2. Use describeTable on the relevant tables to learn their columns and joins.\n' +
+  '3. Write and run SQL queries with runQuery.\n' +
   '4. If a query returns unexpected results, try a different approach.\n' +
-  '5. If the question cannot be answered with the available data, say so.\n\n' +
-  'NEVER answer from your own knowledge. All answers must come from query results.';
+  '5. If the data cannot answer the question, say so.\n' +
+  '6. As soon as your query results answer the question, stop calling ' +
+  'tools and reply.\n\n' +
+  'In your reply:\n' +
+  '- answer: interpret the query results clearly. When listing items such ' +
+  'as books, name each distinct item once and give a count when it ' +
+  'appears more than once.\n' +
+  '- sources: the SELECT statements that produced the key results.\n' +
+  '- confidence: "low" if the database cannot answer the question, even ' +
+  'if you ran queries. Otherwise "high" if the results clearly answer it, ' +
+  'or "medium" if they answer it partially.';
 
-const SYNTHESIS_PROMPT =
-  "You are a database analyst. Using ONLY the research notes below, " +
-  "produce a structured answer to the user's question.\n\n" +
-  'Rules:\n' +
-  '- Set confidence to "high" if the query results clearly answer the ' +
-  'question, "medium" if partially, "low" if the data was not found.\n' +
-  '- In the sources array, include the SQL queries from the notes ' +
-  'that produced the key results (the SELECT statements).\n' +
-  '- Write a clear, natural-language answer that interprets the data.';
+const MAX_TURNS = 10;
+
+const OUT_OF_TURNS_ANSWER =
+  "I couldn't finish researching this question within the allowed " +
+  'steps. Try asking something more specific.';
 
 const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 
@@ -376,65 +312,50 @@ export class ResearchAgent {
   }
 
   async research(question: string): Promise<ResearchResult> {
-    const researchResponse = await this.runResearchPhase(question);
-    const toolCalls = extractToolCalls(researchResponse.messages);
-    const notes = buildResearchNotes(researchResponse);
-    const synthesis = await this.runSynthesisPhase(question, notes);
+    // The model uses the tools as often as it needs, up to MAX_TURNS
+    // times, then replies in the ResearchOutput shape. With throwOnError
+    // off, a failure comes back on the response instead of being thrown.
+    const response = await this.ai.generate({
+      model: this.model,
+      system: PROMPT,
+      prompt: question,
+      tools: [this.listTablesTool, this.describeTableTool, this.runQueryTool],
+      output: { schema: ResearchOutputSchema },
+      maxTurns: MAX_TURNS,
+      throwOnError: false,
+    });
+    const toolCalls = extractToolCalls(response.messages);
 
+    // The model hit the turn limit before it wrote an answer.
+    if (response.finishReason === 'aborted') {
+      return {
+        answer: OUT_OF_TURNS_ANSWER,
+        sources: [],
+        confidence: 'low',
+        toolCalls,
+      };
+    }
+
+    // A failed model call, or a reply that does not match the schema. Throw
+    // with Genkit's status so the route can answer 429, 503 or 500.
+    const output = response.output;
+    if (response.error || !output) {
+      throw new GenkitError({
+        status: (response.error?.status as StatusName | undefined) ?? 'INTERNAL',
+        message: response.error?.message ?? 'The model returned no answer.',
+      });
+    }
+
+    // No query ran, so nothing in the answer came from the database.
+    const ranQuery = toolCalls.some((call) => call.tool === 'runQuery');
     return {
-      answer: synthesis.answer,
-      sources: synthesis.sources,
-      confidence: synthesis.confidence,
+      answer: output.answer,
+      sources: ranQuery ? output.sources : [],
+      confidence: ranQuery ? output.confidence : 'low',
       toolCalls,
     };
   }
-
-  private async runResearchPhase(question: string) {
-    try {
-      return await this.ai.generate({
-        model: this.model,
-        system: RESEARCH_PROMPT,
-        prompt: question,
-        tools: [this.listTablesTool, this.describeTableTool, this.runQueryTool],
-        maxTurns: 10,
-      });
-    } catch (e) {
-      if (!(e instanceof GenkitError)) throw e;
-      const msg = (e.message ?? '').toLowerCase();
-      const isMaxTurns =
-        msg.includes('max turns') ||
-        msg.includes('maximum tool call iterations');
-      if (!isMaxTurns) throw e;
-
-      return this.ai.generate({
-        model: this.model,
-        system:
-          'You ran out of tool-calling turns. Summarize what you ' +
-          'learned from the query results below. Do not call any ' +
-          'more tools.',
-        prompt: question,
-      });
-    }
-  }
-
-  private async runSynthesisPhase(question: string, notes: string) {
-    const response = await this.ai.generate({
-      model: this.model,
-      system: SYNTHESIS_PROMPT,
-      prompt: `Question: ${question}\n\nResearch notes:\n${notes}`,
-      output: { schema: ResearchOutputSchema },
-    });
-
-    return (
-      response.output ?? {
-        answer: 'I was unable to produce a structured answer.',
-        sources: [] as string[],
-        confidence: 'low' as const,
-      }
-    );
-  }
 }
-
 ```
 
 ### Composition root (setup) — `src/agent/setup.ts`
@@ -465,7 +386,6 @@ export function createResearchFlow(db: Database) {
 
   return agent.createFlow();
 }
-
 ```
 
 ### HTTP route handler — `src/routes/research.ts`
@@ -530,7 +450,6 @@ export async function handleResearchPost(
     errorResponse(res, 500, 'Agent failed. Check server logs for details.');
   }
 }
-
 ```
 
 ### HTTP server entry — `src/index.ts`
@@ -547,7 +466,7 @@ import { applyCors, handleCorsPreflight } from './middleware/cors.js';
 import { handleResearchPost } from './routes/research.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '..', '..', 'dart_server', 'data', 'bookstore.db');
+const dbPath = path.resolve(__dirname, '..', '..', '..', 'packages', 'dart_server', 'data', 'bookstore.db');
 
 if (!existsSync(dbPath)) {
   console.error(`Database not found at ${dbPath}.`);
@@ -586,7 +505,6 @@ server.listen(port, host, () => {
   console.log('    -d \'{"question":"Which genre has the most books?"}\'');
   console.log('');
 });
-
 ```
 
 ---

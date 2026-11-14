@@ -6,4 +6,4 @@ environment:
 
 workspace:
   - packages/dart_server
-  - packages/client
+  - packages/flutter_app

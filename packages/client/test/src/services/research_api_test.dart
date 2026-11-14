@@ -48,7 +48,54 @@ void main() {
         ),
       );
 
-      expect(() => api.ask('fail'), throwsA(isA<ResearchApiException>()));
+      expect(
+        () => api.ask('fail'),
+        throwsA(
+          isA<ResearchApiException>()
+              .having((e) => e.message, 'message', 'bad')
+              .having((e) => e.statusCode, 'statusCode', 500),
+        ),
+      );
+    });
+
+    test('falls back to a generic message for a non-JSON error', () async {
+      final api = ResearchApi(
+        baseUrl: _baseUrl,
+        client: MockClient(
+          (request) async => http.Response('Bad Gateway', 502),
+        ),
+      );
+
+      expect(
+        () => api.ask('fail'),
+        throwsA(
+          isA<ResearchApiException>().having(
+            (e) => e.message,
+            'message',
+            'Something went wrong (HTTP 502).',
+          ),
+        ),
+      );
+    });
+
+    test('says when the server cannot be reached', () async {
+      final api = ResearchApi(
+        baseUrl: _baseUrl,
+        client: MockClient(
+          (request) async => throw http.ClientException('Connection refused'),
+        ),
+      );
+
+      expect(
+        () => api.ask('anything'),
+        throwsA(
+          isA<ResearchApiException>().having(
+            (e) => e.message,
+            'message',
+            "Can't reach the server at $_baseUrl. Is it running?",
+          ),
+        ),
+      );
     });
   });
 }

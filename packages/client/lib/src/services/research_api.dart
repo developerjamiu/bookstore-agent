@@ -42,16 +42,23 @@ class ResearchApi {
   ResearchApi({required this.baseUrl, required this._client});
 
   Future<ResearchResult> ask(String question) async {
-    final response = await _client.post(
-      baseUrl.resolve('/api/research'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'question': question}),
-    );
+    final http.Response response;
+    try {
+      response = await _client.post(
+        baseUrl.resolve('/api/research'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'question': question}),
+      );
+    } on http.ClientException {
+      throw ResearchApiException(
+        "Can't reach the server at $baseUrl. Is it running?",
+      );
+    }
 
     if (response.statusCode != 200) {
       throw ResearchApiException(
+        _errorMessage(response),
         statusCode: response.statusCode,
-        body: response.body,
       );
     }
 
@@ -59,14 +66,29 @@ class ResearchApi {
       jsonDecode(response.body) as Map<String, dynamic>,
     );
   }
+
+  /// The server sends errors as `{"error": "..."}`. Falls back to a generic
+  /// message when the body is something else.
+  static String _errorMessage(http.Response response) {
+    final fallback = 'Something went wrong (HTTP ${response.statusCode}).';
+    try {
+      final body = jsonDecode(response.body);
+      return body is Map && body['error'] is String
+          ? body['error'] as String
+          : fallback;
+    } on FormatException {
+      return fallback;
+    }
+  }
 }
 
 class ResearchApiException implements Exception {
-  final int statusCode;
-  final String body;
+  /// A message that is safe to show in the app.
+  final String message;
+  final int? statusCode;
 
-  ResearchApiException({required this.statusCode, required this.body});
+  ResearchApiException(this.message, {this.statusCode});
 
   @override
-  String toString() => 'ResearchApiException($statusCode): $body';
+  String toString() => message;
 }

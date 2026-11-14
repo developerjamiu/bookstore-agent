@@ -68,16 +68,16 @@ bookstore-agent/
 │   │       ├── routes/
 │   │       │   └── research.ts          # POST /api/research; validates JSON; calls agent flow
 │   │       ├── schemas/
-│   │       │   └── researchResult.ts    # Zod: ResearchResult, tool calls, synthesis output
+│   │       │   └── researchResult.ts    # Zod: ResearchResult, tool calls, model output
 │   │       ├── tools/
 │   │       │   ├── listTables.ts        # Tool: list SQLite tables
 │   │       │   ├── describeTable.ts     # Tool: PRAGMA schema / FKs for one table
 │   │       │   └── runQuery.ts          # Tool: read-only SELECT (row cap)
 │   │       ├── utils/
 │   │       │   ├── requestHelpers.ts    # JSON responses + Genkit error mapping
-│   │       │   └── messageHelpers.ts     # Extract tool calls; build research notes for synthesis
+│   │       │   └── messageHelpers.ts     # List the tools the agent called
 │   │       └── agent/
-│   │           ├── researchAgent.ts      # Two-phase agent: tool loop + structured synthesis
+│   │           ├── researchAgent.ts      # Agent: tool loop + JSON answer
 │   │           └── setup.ts             # Composition root: Genkit + tools + flow
 │   │
 │   ├── dart_server/

@@ -76,7 +76,7 @@ You'll see this JSON (formatted here for easier reading):
 **Run the Flutter app.** Start an iOS Simulator or Android emulator first, then in another terminal run:
 
 ```sh
-cd packages/client
+cd packages/flutter_app
 flutter run
 ```
 
@@ -798,7 +798,7 @@ How it works:
 
    You should get JSON with an `answer` that names Classics (12 books), the SQL behind it in `sources`, and the tools the agent called in `toolCalls`. The wording changes from run to run.
 
-4. Ask the same question in the Flutter app from Step 0. If you closed it, run `flutter run` in `packages/client` again. You get the agent's answer instead of the placeholder.
+4. Ask the same question in the Flutter app from Step 0. If you closed it, run `flutter run` in `packages/flutter_app` again. You get the agent's answer instead of the placeholder.
 
 If curl prints `{"error":"Agent failed. Check server logs for details."}` and the server log shows `apiKey must be set to an API key`, the server can't see your key. Run the `export` line in the server's terminal, then restart the server.
 

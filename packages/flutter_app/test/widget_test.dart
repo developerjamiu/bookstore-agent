@@ -1,5 +1,5 @@
-import 'package:client/src/app.dart';
-import 'package:client/src/services/research_api.dart';
+import 'package:flutter_app/src/app.dart';
+import 'package:flutter_app/src/services/research_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 

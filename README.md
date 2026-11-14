@@ -96,7 +96,7 @@ bookstore-agent/
 │   │           ├── utils/               # Message helper tests
 │   │           └── helpers/             # In-memory test database
 │   │
-│   └── client/                          # Flutter app
+│   └── flutter_app/                     # Flutter app
 │       ├── lib/src/
 │       │   ├── app.dart
 │       │   ├── screens/research_screen.dart
@@ -154,7 +154,7 @@ extension. You'll see 9 tables with real data:
 
 ```sh
 # Client — mock HTTP
-cd packages/client && flutter test
+cd packages/flutter_app && flutter test
 ```
 
 On **`starter`**, the Dart server package does not yet include the full agent test suite (that lives on upstream **`main`**).
@@ -223,7 +223,7 @@ curl -s http://localhost:8080/api/research \
 With the server running, start an iOS Simulator or Android emulator, then:
 
 ```sh
-cd packages/client
+cd packages/flutter_app
 flutter run
 ```
 

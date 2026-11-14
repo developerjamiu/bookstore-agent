@@ -21,6 +21,7 @@ That is what makes it an **agent** rather than a chatbot. A chatbot answers from
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) with Dart 3.12 or later (check with `flutter --version`)
 - A Google AI API key ([get one free](https://aistudio.google.com/apikey))
 - An iOS Simulator (Xcode) or Android emulator (Android Studio) to run the Flutter app
+- A code editor, such as [VS Code](https://code.visualstudio.com/) with the Dart and Flutter extensions
 
 ---
 
@@ -32,6 +33,8 @@ cd bookstore-agent
 git checkout starter
 flutter pub get
 ```
+
+Open the `bookstore-agent` folder in your editor. In VS Code, use File > Open Folder, or run `code .` from the same terminal. You'll create every file in this codelab inside this folder, and the terminal commands run from it unless a step says otherwise.
 
 ### Explore what you have
 
